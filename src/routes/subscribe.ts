@@ -1,8 +1,41 @@
 import type { Context } from 'hono';
-import { html } from 'hono/html';
+import { Agent } from '@atproto/api';
 import { ALLOWED_ORIGINS } from '../config.js';
 import { getSessionDid } from '../auth.js';
-import { handleForm } from '../views.js';
+import { oauthClient } from '../oauth.js';
+import { handleForm, confirmPage, alreadyActioned, successPage, errorPage } from '../views.js';
+
+async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
+  try {
+    const session = await oauthClient.restore(did);
+    const agent = new Agent(session);
+    const desc = await agent.com.atproto.repo.describeRepo({ repo: did });
+    return { agent, handle: desc.data.handle };
+  } catch {
+    return null;
+  }
+}
+
+async function hasExistingSubscription(agent: Agent, did: string, publicationUri: string): Promise<boolean> {
+  try {
+    let cursor: string | undefined;
+    do {
+      const res = await agent.com.atproto.repo.listRecords({
+        repo: did,
+        collection: 'site.standard.graph.subscription',
+        limit: 100,
+        cursor,
+      });
+      if (res.data.records.some((r) => (r.value as { subject?: string }).subject === publicationUri)) {
+        return true;
+      }
+      cursor = res.data.cursor;
+    } while (cursor);
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 export async function handleSubscribe(c: Context) {
   const publicationUri = c.req.query('publication') ?? '';
@@ -18,39 +51,86 @@ export async function handleSubscribe(c: Context) {
 
   const did = getSessionDid(c);
 
-  if (did) {
-    // Confirmation UI is added in SOCIAL #3
-    return c.html(html`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subscribe — Scribe</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
-           min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-    .card { background: #fff; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center; }
-    p { color: #555; font-size: 0.875rem; line-height: 1.5; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <p>Signed in as <code>${did}</code>. Subscribe confirmation UI coming soon.</p>
-  </div>
-</body>
-</html>`);
+  if (!did) {
+    return c.html(
+      handleForm({
+        heading: title ? `Subscribe to ${title}` : 'Subscribe',
+        subtitle: 'Sign in with your Bluesky account to subscribe.',
+        action: 'subscribe',
+        uri: publicationUri,
+        origin,
+        title,
+      })
+    );
   }
 
-  return c.html(
-    handleForm({
-      heading: title ? `Subscribe to ${title}` : 'Subscribe',
-      subtitle: 'Sign in with your Bluesky account to subscribe.',
-      action: 'subscribe',
-      uri: publicationUri,
-      origin,
-      title,
-    })
-  );
+  const result = await getAgentAndHandle(did);
+  if (!result) {
+    c.header('Set-Cookie', `scribe_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`);
+    return c.html(
+      handleForm({
+        heading: title ? `Subscribe to ${title}` : 'Subscribe',
+        subtitle: 'Sign in with your Bluesky account to subscribe.',
+        action: 'subscribe',
+        uri: publicationUri,
+        origin,
+        title,
+        error: 'Your session expired. Please sign in again.',
+      })
+    );
+  }
+
+  const { agent, handle } = result;
+
+  if (await hasExistingSubscription(agent, did, publicationUri)) {
+    return c.html(alreadyActioned({ action: 'subscribe', title }));
+  }
+
+  return c.html(confirmPage({ action: 'subscribe', handle, uri: publicationUri, origin, title }));
+}
+
+export async function handleSubscribePost(c: Context) {
+  const body = await c.req.parseBody();
+  const publicationUri = (body.publication as string) ?? '';
+  const origin = (body.origin as string) ?? '';
+
+  if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
+    return c.text('Invalid origin', 400);
+  }
+  if (!publicationUri.startsWith('at://')) {
+    return c.text('Invalid publication URI', 400);
+  }
+
+  const did = getSessionDid(c);
+  if (!did) {
+    return c.html(errorPage('Session not found. Please close this window and try again.'));
+  }
+
+  const result = await getAgentAndHandle(did);
+  if (!result) {
+    return c.html(errorPage('Session expired. Please close this window and try again.'));
+  }
+
+  const { agent } = result;
+
+  if (await hasExistingSubscription(agent, did, publicationUri)) {
+    return c.html(alreadyActioned({ action: 'subscribe', title: '' }));
+  }
+
+  try {
+    await agent.com.atproto.repo.createRecord({
+      repo: did,
+      collection: 'site.standard.graph.subscription',
+      record: {
+        $type: 'site.standard.graph.subscription',
+        subject: publicationUri,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.html(errorPage(`Could not create record: ${message}`));
+  }
+
+  return c.html(successPage({ action: 'subscribe', origin }));
 }
