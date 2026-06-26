@@ -7,6 +7,7 @@ export function handleForm(opts: {
   uri: string;
   origin: string;
   title: string;
+  token?: string;
   error?: string;
 }) {
   return html`<!DOCTYPE html>
@@ -45,6 +46,7 @@ export function handleForm(opts: {
       <input type="hidden" name="uri" value="${opts.uri}">
       <input type="hidden" name="origin" value="${opts.origin}">
       <input type="hidden" name="title" value="${opts.title}">
+      ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
       <label for="handle">Your Bluesky handle</label>
       <input type="text" id="handle" name="handle" placeholder="you.bsky.social"
              autocomplete="username" required autofocus>
@@ -61,6 +63,7 @@ export function confirmPage(opts: {
   uri: string;
   origin: string;
   title: string;
+  token?: string;
 }) {
   const heading = opts.action === 'recommend'
     ? (opts.title ? `Like "${opts.title}"` : 'Like this article')
@@ -101,6 +104,7 @@ export function confirmPage(opts: {
     <form method="POST" action="/${opts.action}">
       <input type="hidden" name="${hiddenName}" value="${opts.uri}">
       <input type="hidden" name="origin" value="${opts.origin}">
+      ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
       <div class="actions">
         <button type="button" onclick="window.close()">Cancel</button>
         <button type="submit">${buttonText}</button>

@@ -37,9 +37,10 @@ export async function handleCallback(c: Context) {
     return c.html(errorPage('Session expired. Please close this window and try again.'), 400);
   }
 
+  const tokenParam = pending.token ? `&token=${encodeURIComponent(pending.token)}` : '';
   const redirectPath = pending.action === 'recommend'
-    ? `/recommend?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}`
-    : `/subscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}`;
+    ? `/recommend?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`
+    : `/subscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
 
   return c.redirect(redirectPath);
 }

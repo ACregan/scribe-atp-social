@@ -3,6 +3,7 @@ import { Agent } from '@atproto/api';
 import { ALLOWED_ORIGINS } from '../config.js';
 import { getSessionDid } from '../auth.js';
 import { oauthClient } from '../oauth.js';
+import { completionTokens } from '../db.js';
 import { handleForm, confirmPage, alreadyActioned, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -41,6 +42,7 @@ export async function handleSubscribe(c: Context) {
   const publicationUri = c.req.query('publication') ?? '';
   const origin = c.req.query('origin') ?? '';
   const title = c.req.query('title') ?? '';
+  const token = c.req.query('token') || undefined;
 
   if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
     return c.text('Invalid origin', 400);
@@ -60,6 +62,7 @@ export async function handleSubscribe(c: Context) {
         uri: publicationUri,
         origin,
         title,
+        token,
       })
     );
   }
@@ -75,6 +78,7 @@ export async function handleSubscribe(c: Context) {
         uri: publicationUri,
         origin,
         title,
+        token,
         error: 'Your session expired. Please sign in again.',
       })
     );
@@ -86,13 +90,14 @@ export async function handleSubscribe(c: Context) {
     return c.html(alreadyActioned({ action: 'subscribe', title }));
   }
 
-  return c.html(confirmPage({ action: 'subscribe', handle, uri: publicationUri, origin, title }));
+  return c.html(confirmPage({ action: 'subscribe', handle, uri: publicationUri, origin, title, token }));
 }
 
 export async function handleSubscribePost(c: Context) {
   const body = await c.req.parseBody();
   const publicationUri = (body.publication as string) ?? '';
   const origin = (body.origin as string) ?? '';
+  const token = (body.token as string) || undefined;
 
   if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
     return c.text('Invalid origin', 400);
@@ -131,6 +136,8 @@ export async function handleSubscribePost(c: Context) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return c.html(errorPage(`Could not create record: ${message}`));
   }
+
+  if (token) completionTokens.store(token, 'subscribe');
 
   return c.html(successPage({ action: 'subscribe', origin }));
 }
