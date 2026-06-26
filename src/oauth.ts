@@ -4,7 +4,7 @@ import { OAUTH_SCOPE } from './config.js';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const publicUrl = process.env.PUBLIC_URL ?? 'https://social.scribe-atp.app';
-const port = process.env.PORT ?? '3010';
+const port = process.env.PORT ?? '3011';
 
 const clientId = isProduction
   ? `${publicUrl}/client-metadata.json`

@@ -4,7 +4,7 @@ import { OAUTH_SCOPE, isProduction, publicUrl } from '../oauth.js';
 export function handleClientMetadata(c: Context) {
   const redirectUri = isProduction
     ? `${publicUrl}/callback`
-    : `http://127.0.0.1:${process.env.PORT ?? '3010'}/callback`;
+    : `http://127.0.0.1:${process.env.PORT ?? '3011'}/callback`;
 
   return c.json(
     {
