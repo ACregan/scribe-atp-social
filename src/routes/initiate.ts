@@ -15,6 +15,7 @@ export async function handleInitiate(c: Context) {
   const uri = body.uri as string;
   const origin = body.origin as string;
   const title = (body.title as string) ?? '';
+  const token = (body.token as string) || undefined;
 
   if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
     return c.html(errorPage('Invalid origin.'), 400);
@@ -28,37 +29,27 @@ export async function handleInitiate(c: Context) {
     return c.html(errorPage('Invalid URI.'), 400);
   }
 
+  const formOpts = {
+    heading: action === 'recommend' ? `Like "${title}"` : `Subscribe to ${title}`,
+    subtitle: action === 'recommend'
+      ? 'Sign in with your Bluesky account to like this article.'
+      : 'Sign in with your Bluesky account to subscribe.',
+    action: action as 'recommend' | 'subscribe',
+    uri,
+    origin,
+    title,
+    token,
+  };
+
   if (!handle) {
-    return c.html(
-      handleForm({
-        heading: action === 'recommend' ? `Like "${title}"` : `Subscribe to ${title}`,
-        subtitle: action === 'recommend'
-          ? 'Sign in with your Bluesky account to like this article.'
-          : 'Sign in with your Bluesky account to subscribe.',
-        action,
-        uri,
-        origin,
-        title,
-        error: 'Please enter your Bluesky handle.',
-      })
-    );
+    return c.html(handleForm({ ...formOpts, error: 'Please enter your Bluesky handle.' }));
   }
 
   const ip = getClientIp(c);
 
   if (initiateAttempts.isLimited(ip)) {
     return c.html(
-      handleForm({
-        heading: action === 'recommend' ? `Like "${title}"` : `Subscribe to ${title}`,
-        subtitle: action === 'recommend'
-          ? 'Sign in with your Bluesky account to like this article.'
-          : 'Sign in with your Bluesky account to subscribe.',
-        action,
-        uri,
-        origin,
-        title,
-        error: 'Too many attempts. Please try again in a few minutes.',
-      }),
+      handleForm({ ...formOpts, error: 'Too many attempts. Please try again in a few minutes.' }),
       429
     );
   }
@@ -72,20 +63,13 @@ export async function handleInitiate(c: Context) {
     console.error('OAuth authorize error:', err);
     return c.html(
       handleForm({
-        heading: action === 'recommend' ? `Like "${title}"` : `Subscribe to ${title}`,
-        subtitle: action === 'recommend'
-          ? 'Sign in with your Bluesky account to like this article.'
-          : 'Sign in with your Bluesky account to subscribe.',
-        action,
-        uri,
-        origin,
-        title,
+        ...formOpts,
         error: err instanceof Error ? err.message : 'Failed to start sign-in. Please check your handle and try again.',
       })
     );
   }
 
-  const pending: PendingData = { action, uri, origin, title };
+  const pending: PendingData = { action, uri, origin, title, token };
   setCookie(c, PENDING_COOKIE, encodePending(pending), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

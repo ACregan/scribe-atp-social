@@ -1,7 +1,9 @@
 export const ALLOWED_ORIGINS = [
   'https://norobots.blog',
   'https://anthonycregan.co.uk',
+  'https://www.anthonycregan.co.uk',
   'https://perpetualsummer.ltd',
+  'https://www.perpetualsummer.ltd',
 ] as const;
 
 export type AllowedOrigin = (typeof ALLOWED_ORIGINS)[number];

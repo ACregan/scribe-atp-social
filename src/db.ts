@@ -48,6 +48,12 @@ function migrate(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS initiate_attempts_ip_created
       ON initiate_attempts (ip, created_at);
+
+    CREATE TABLE IF NOT EXISTS completion_tokens (
+      token      TEXT    PRIMARY KEY,
+      action     TEXT    NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
   `);
 }
 
@@ -65,6 +71,7 @@ export const db = getDb();
 
 pruneStaleState(db);
 pruneStaleInitiateAttempts(db);
+pruneStaleCompletionTokens(db);
 
 export const oauthStateStore = {
   get: (key: string) => {
@@ -121,6 +128,24 @@ export const sessionStore = {
   },
   delete: (id: string) => {
     db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+  },
+};
+
+function pruneStaleCompletionTokens(db: Database.Database) {
+  db.prepare('DELETE FROM completion_tokens WHERE created_at < unixepoch() - 3600').run();
+}
+
+export const completionTokens = {
+  store: (token: string, action: string) => {
+    db.prepare(
+      'INSERT OR IGNORE INTO completion_tokens (token, action) VALUES (?, ?)'
+    ).run(token, action);
+  },
+  lookup: (token: string): string | undefined => {
+    const row = db
+      .prepare<string, { action: string }>('SELECT action FROM completion_tokens WHERE token = ?')
+      .get(token);
+    return row?.action;
   },
 };
 
