@@ -1,0 +1,24 @@
+{
+  "name": "scribe-atp-social",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.19.18",
+    "@atproto/oauth-client-node": "^0.3.17",
+    "@hono/node-server": "^1.14.4",
+    "better-sqlite3": "^12.10.0",
+    "hono": "^4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22",
+    "typescript": "^5"
+  }
+}
