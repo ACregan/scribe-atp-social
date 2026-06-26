@@ -1,0 +1,140 @@
+import Database from 'better-sqlite3';
+import path from 'node:path';
+import fs from 'node:fs';
+import { RATE_LIMIT_WINDOW, RATE_LIMIT_MAX } from './config.js';
+
+const DB_PATH = path.resolve(process.cwd(), 'data/social.db');
+
+let _db: Database.Database | undefined;
+
+function getDb(): Database.Database {
+  if (!_db) {
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+    _db = new Database(DB_PATH);
+    _db.pragma('journal_mode = WAL');
+  }
+  migrate(_db);
+  return _db;
+}
+
+function migrate(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS oauth_state (
+      key        TEXT    PRIMARY KEY,
+      value      TEXT    NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE IF NOT EXISTS oauth_session (
+      key        TEXT    PRIMARY KEY,
+      value      TEXT    NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id           TEXT    PRIMARY KEY,
+      did          TEXT    NOT NULL,
+      created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+      last_used_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS sessions_did ON sessions (did);
+
+    CREATE TABLE IF NOT EXISTS initiate_attempts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      ip         TEXT    NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS initiate_attempts_ip_created
+      ON initiate_attempts (ip, created_at);
+  `);
+}
+
+function pruneStaleState(db: Database.Database) {
+  db.prepare('DELETE FROM oauth_state WHERE created_at < unixepoch() - 600').run();
+}
+
+function pruneStaleInitiateAttempts(db: Database.Database) {
+  db.prepare(
+    'DELETE FROM initiate_attempts WHERE created_at < unixepoch() - ?'
+  ).run(RATE_LIMIT_WINDOW);
+}
+
+export const db = getDb();
+
+pruneStaleState(db);
+pruneStaleInitiateAttempts(db);
+
+export const oauthStateStore = {
+  get: (key: string) => {
+    const row = db
+      .prepare<string, { value: string }>('SELECT value FROM oauth_state WHERE key = ?')
+      .get(key);
+    return Promise.resolve(row ? JSON.parse(row.value) : undefined);
+  },
+  set: (key: string, val: unknown) => {
+    db.prepare(
+      'INSERT OR REPLACE INTO oauth_state (key, value, created_at) VALUES (?, ?, unixepoch())'
+    ).run(key, JSON.stringify(val));
+    return Promise.resolve();
+  },
+  del: (key: string) => {
+    db.prepare('DELETE FROM oauth_state WHERE key = ?').run(key);
+    return Promise.resolve();
+  },
+};
+
+export const oauthSessionStore = {
+  get: (key: string) => {
+    const row = db
+      .prepare<string, { value: string }>('SELECT value FROM oauth_session WHERE key = ?')
+      .get(key);
+    return Promise.resolve(row ? JSON.parse(row.value) : undefined);
+  },
+  set: (key: string, val: unknown) => {
+    db.prepare(
+      'INSERT OR REPLACE INTO oauth_session (key, value, updated_at) VALUES (?, ?, unixepoch())'
+    ).run(key, JSON.stringify(val));
+    return Promise.resolve();
+  },
+  del: (key: string) => {
+    db.prepare('DELETE FROM oauth_session WHERE key = ?').run(key);
+    return Promise.resolve();
+  },
+};
+
+export const sessionStore = {
+  create: (did: string): string => {
+    const id = crypto.randomUUID();
+    db.prepare('INSERT INTO sessions (id, did) VALUES (?, ?)').run(id, did);
+    return id;
+  },
+  get: (id: string): string | undefined => {
+    const row = db
+      .prepare<string, { did: string }>('SELECT did FROM sessions WHERE id = ?')
+      .get(id);
+    return row?.did;
+  },
+  touch: (id: string) => {
+    db.prepare('UPDATE sessions SET last_used_at = unixepoch() WHERE id = ?').run(id);
+  },
+  delete: (id: string) => {
+    db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+  },
+};
+
+export const initiateAttempts = {
+  record: (ip: string) => {
+    db.prepare('INSERT INTO initiate_attempts (ip) VALUES (?)').run(ip);
+  },
+  count: (ip: string): number => {
+    const row = db
+      .prepare<[string, number], { n: number }>(
+        'SELECT COUNT(*) as n FROM initiate_attempts WHERE ip = ? AND created_at > unixepoch() - ?'
+      )
+      .get(ip, RATE_LIMIT_WINDOW);
+    return row?.n ?? 0;
+  },
+  isLimited: (ip: string): boolean => initiateAttempts.count(ip) >= RATE_LIMIT_MAX,
+};
