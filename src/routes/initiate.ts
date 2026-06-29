@@ -16,12 +16,14 @@ export async function handleInitiate(c: Context) {
   const origin = body.origin as string;
   const title = (body.title as string) ?? '';
   const token = (body.token as string) || undefined;
+  const canonicalUrl = (body.canonicalUrl as string) || undefined;
+  const publication = (body.publication as string) || undefined;
 
   if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
     return c.html(errorPage('Invalid origin.'), 400);
   }
 
-  if (action !== 'recommend' && action !== 'subscribe') {
+  if (action !== 'recommend' && action !== 'subscribe' && action !== 'share') {
     return c.html(errorPage('Invalid action.'), 400);
   }
 
@@ -29,16 +31,23 @@ export async function handleInitiate(c: Context) {
     return c.html(errorPage('Invalid URI.'), 400);
   }
 
+  const headingMap = { recommend: `Like "${title}"`, subscribe: `Subscribe to ${title}`, share: `Share "${title}"` };
+  const subtitleMap = {
+    recommend: 'Sign in with your Bluesky account to like this article.',
+    subscribe: 'Sign in with your Bluesky account to subscribe.',
+    share: 'Sign in with your Bluesky account to share this article.',
+  };
+
   const formOpts = {
-    heading: action === 'recommend' ? `Like "${title}"` : `Subscribe to ${title}`,
-    subtitle: action === 'recommend'
-      ? 'Sign in with your Bluesky account to like this article.'
-      : 'Sign in with your Bluesky account to subscribe.',
-    action: action as 'recommend' | 'subscribe',
+    heading: headingMap[action as keyof typeof headingMap],
+    subtitle: subtitleMap[action as keyof typeof subtitleMap],
+    action: action as 'recommend' | 'subscribe' | 'share',
     uri,
     origin,
     title,
     token,
+    canonicalUrl,
+    publication,
   };
 
   if (!handle) {
@@ -69,7 +78,7 @@ export async function handleInitiate(c: Context) {
     );
   }
 
-  const pending: PendingData = { action, uri, origin, title, token };
+  const pending: PendingData = { action: action as PendingData['action'], uri, origin, title, token, canonicalUrl, publication };
   setCookie(c, PENDING_COOKIE, encodePending(pending), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

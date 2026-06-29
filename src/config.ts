@@ -12,6 +12,7 @@ export const OAUTH_SCOPE = [
   'atproto',
   'repo:site.standard.graph.recommend?action=create',
   'repo:site.standard.graph.subscription?action=create',
+  'repo:app.bsky.feed.post?action=create',
 ].join(' ');
 
 export const SESSION_COOKIE = 'scribe_session';

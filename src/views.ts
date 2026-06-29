@@ -3,12 +3,14 @@ import { html } from 'hono/html';
 export function handleForm(opts: {
   heading: string;
   subtitle: string;
-  action: 'recommend' | 'subscribe';
+  action: 'recommend' | 'subscribe' | 'share';
   uri: string;
   origin: string;
   title: string;
   token?: string;
   error?: string;
+  canonicalUrl?: string;
+  publication?: string;
 }) {
   return html`<!DOCTYPE html>
 <html lang="en">
@@ -47,6 +49,8 @@ export function handleForm(opts: {
       <input type="hidden" name="origin" value="${opts.origin}">
       <input type="hidden" name="title" value="${opts.title}">
       ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
+      ${opts.canonicalUrl ? html`<input type="hidden" name="canonicalUrl" value="${opts.canonicalUrl}">` : ''}
+      ${opts.publication ? html`<input type="hidden" name="publication" value="${opts.publication}">` : ''}
       <label for="handle">Your Bluesky handle</label>
       <input type="text" id="handle" name="handle" placeholder="you.bsky.social"
              autocomplete="username" required autofocus>
@@ -152,14 +156,73 @@ export function alreadyActioned(opts: {
 </html>`;
 }
 
+export function shareConfirmPage(opts: {
+  handle: string;
+  documentUri: string;
+  publicationUri: string;
+  canonicalUrl: string;
+  defaultText: string;
+  origin: string;
+  token?: string;
+}) {
+  return html`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Share — Scribe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
+           min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .card { background: #fff; border-radius: 12px; padding: 2rem; width: 100%; max-width: 400px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+    h1 { font-size: 1.2rem; margin-bottom: 0.375rem; color: #111; }
+    .handle { color: #555; font-size: 0.875rem; margin-bottom: 1.25rem; }
+    label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; color: #333; }
+    textarea { display: block; width: 100%; padding: 0.625rem 0.75rem; border: 1.5px solid #ddd;
+               border-radius: 8px; font-size: 0.9375rem; outline: none; resize: vertical;
+               font-family: inherit; line-height: 1.5; }
+    textarea:focus { border-color: #0085ff; }
+    .actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
+    button { flex: 1; padding: 0.625rem; border: none; border-radius: 8px;
+             font-size: 1rem; font-weight: 600; cursor: pointer; }
+    button[type="submit"] { background: #0085ff; color: #fff; }
+    button[type="submit"]:hover { background: #006ed4; }
+    button[type="button"] { background: #eee; color: #333; }
+    button[type="button"]:hover { background: #ddd; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Share to Bluesky</h1>
+    <p class="handle">Posting as @${opts.handle}</p>
+    <form method="POST" action="/share">
+      <input type="hidden" name="document" value="${opts.documentUri}">
+      <input type="hidden" name="publication" value="${opts.publicationUri}">
+      <input type="hidden" name="canonicalUrl" value="${opts.canonicalUrl}">
+      <input type="hidden" name="origin" value="${opts.origin}">
+      ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
+      <label for="share-text">Your post</label>
+      <textarea id="share-text" name="text" rows="4" autofocus>${opts.defaultText}</textarea>
+      <div class="actions">
+        <button type="button" onclick="window.close()">Cancel</button>
+        <button type="submit">Share</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>`;
+}
+
 export function successPage(opts: {
-  action: 'recommend' | 'subscribe';
+  action: 'recommend' | 'subscribe' | 'share';
   origin: string;
 }) {
-  const heading = opts.action === 'recommend' ? 'Liked ✓' : 'Subscribed ✓';
+  const heading = opts.action === 'recommend' ? 'Liked ✓' : opts.action === 'subscribe' ? 'Subscribed ✓' : 'Shared ✓';
   const message = opts.action === 'recommend'
     ? 'Thanks for the like!'
-    : 'Thanks for subscribing!';
+    : opts.action === 'subscribe' ? 'Thanks for subscribing!' : 'Thanks for sharing!';
 
   return html`<!DOCTYPE html>
 <html lang="en">

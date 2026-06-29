@@ -54,6 +54,17 @@ function migrate(db: Database.Database) {
       action     TEXT    NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS action_events (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      action_type  TEXT    NOT NULL,
+      subject_uri  TEXT    NOT NULL,
+      did          TEXT    NOT NULL,
+      created_at   INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS action_events_subject
+      ON action_events (action_type, subject_uri);
   `);
 }
 
@@ -146,6 +157,14 @@ export const completionTokens = {
       .prepare<string, { action: string }>('SELECT action FROM completion_tokens WHERE token = ?')
       .get(token);
     return row?.action;
+  },
+};
+
+export const actionEvents = {
+  log: (actionType: string, subjectUri: string, did: string) => {
+    db.prepare(
+      'INSERT INTO action_events (action_type, subject_uri, did) VALUES (?, ?, ?)'
+    ).run(actionType, subjectUri, did);
   },
 };
 

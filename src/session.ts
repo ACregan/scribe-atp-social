@@ -10,11 +10,13 @@ if (process.env.SESSION_SECRET.length < 32) {
 const SECRET = process.env.SESSION_SECRET;
 
 export interface PendingData {
-  action: 'recommend' | 'subscribe';
+  action: 'recommend' | 'subscribe' | 'share';
   uri: string;
   origin: string;
   title: string;
   token?: string;
+  canonicalUrl?: string;
+  publication?: string;
 }
 
 function hmac(value: string): string {
