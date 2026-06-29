@@ -17,7 +17,7 @@ async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: s
   }
 }
 
-async function fetchAtRecordCid(atUri: string): Promise<string | null> {
+async function fetchAtRecord(atUri: string): Promise<{ cid: string; value: Record<string, unknown> } | null> {
   try {
     const match = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
     if (!match) return null;
@@ -35,11 +35,16 @@ async function fetchAtRecordCid(atUri: string): Promise<string | null> {
     url.searchParams.set('rkey', rkey);
     const res = await fetch(url);
     if (!res.ok) return null;
-    const data = await res.json() as { cid?: string };
-    return data.cid ?? null;
+    const data = await res.json() as { cid?: string; value?: Record<string, unknown> };
+    if (!data.cid) return null;
+    return { cid: data.cid, value: data.value ?? {} };
   } catch {
     return null;
   }
+}
+
+async function fetchAtRecordCid(atUri: string): Promise<string | null> {
+  return fetchAtRecord(atUri).then((r) => r?.cid ?? null);
 }
 
 export async function handleShare(c: Context) {
@@ -133,16 +138,36 @@ export async function handleSharePost(c: Context) {
 
   const { agent } = result;
 
-  // Fetch CIDs for associatedRefs (non-fatal — post is created even if lookup fails)
-  const [docCid, pubCid] = await Promise.all([
-    fetchAtRecordCid(documentUri),
+  // Fetch document record (title, description, splashImageUrl) + publication CID (non-fatal)
+  const [docRecord, pubCid] = await Promise.all([
+    fetchAtRecord(documentUri),
     publicationUri.startsWith('at://') ? fetchAtRecordCid(publicationUri) : Promise.resolve(null),
   ]);
 
+  const docCid = docRecord?.cid ?? null;
+  const embedTitle = (docRecord?.value?.title as string | undefined) ?? '';
+  const embedDescription = (docRecord?.value?.description as string | undefined) ?? '';
+  const splashImageUrl = (docRecord?.value?.splashImageUrl as string | undefined) ?? null;
+
+  // Upload splash image as card thumb (non-fatal)
+  let thumb: unknown = undefined;
+  if (splashImageUrl) {
+    try {
+      const imageRes = await fetch(splashImageUrl);
+      if (imageRes.ok) {
+        const contentType = imageRes.headers.get('content-type') ?? 'image/jpeg';
+        const imageBuffer = await imageRes.arrayBuffer();
+        const uploadRes = await agent.uploadBlob(new Uint8Array(imageBuffer), { encoding: contentType });
+        thumb = uploadRes.data.blob;
+      }
+    } catch { /* non-fatal */ }
+  }
+
   const external: Record<string, unknown> = {
     uri: canonicalUrl,
-    title: '',
-    description: '',
+    title: embedTitle,
+    description: embedDescription,
+    ...(thumb ? { thumb } : {}),
   };
 
   if (docCid && pubCid) {
