@@ -153,7 +153,8 @@ export async function handleSharePost(c: Context) {
   let thumb: unknown = undefined;
   if (splashImageUrl) {
     try {
-      const imageRes = await fetch(splashImageUrl);
+      const thumbUrl = splashImageUrl.replace(/\/(600|1200|1800|max)\.webp$/, '/thumb.webp');
+      const imageRes = await fetch(thumbUrl);
       if (imageRes.ok) {
         const contentType = imageRes.headers.get('content-type') ?? 'image/jpeg';
         const imageBuffer = await imageRes.arrayBuffer();
