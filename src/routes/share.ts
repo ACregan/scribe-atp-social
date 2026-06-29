@@ -161,7 +161,7 @@ export async function handleSharePost(c: Context) {
         const uploadRes = await agent.uploadBlob(new Uint8Array(imageBuffer), { encoding: contentType });
         thumb = uploadRes.data.blob;
       }
-    } catch { /* non-fatal */ }
+    } catch (err) { console.error('[share] thumb upload failed:', err); }
   }
 
   const external: Record<string, unknown> = {
