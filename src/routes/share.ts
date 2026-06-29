@@ -165,6 +165,16 @@ export async function handleSharePost(c: Context) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('Missing required scope')) {
+      // Session pre-dates the app.bsky.feed.post scope — clear it and prompt re-auth
+      c.header('Set-Cookie', `scribe_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`);
+      const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+      const canonicalParam = canonicalUrl ? `&canonicalUrl=${encodeURIComponent(canonicalUrl)}` : '';
+      const pubParam = publicationUri ? `&publication=${encodeURIComponent(publicationUri)}` : '';
+      return c.redirect(
+        `/share?document=${encodeURIComponent(documentUri)}&origin=${encodeURIComponent(origin)}&title=${encodeURIComponent('')}${canonicalParam}${pubParam}${tokenParam}`
+      );
+    }
     return c.html(errorPage(`Could not create post: ${message}`));
   }
 
