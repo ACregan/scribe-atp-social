@@ -161,7 +161,18 @@ export async function handleSharePost(c: Context) {
         const uploadRes = await agent.uploadBlob(new Uint8Array(imageBuffer), { encoding: contentType });
         thumb = uploadRes.data.blob;
       }
-    } catch (err) { console.error('[share] thumb upload failed:', err); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('Missing required scope')) {
+        c.header('Set-Cookie', `scribe_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`);
+        const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+        const canonicalParam = canonicalUrl ? `&canonicalUrl=${encodeURIComponent(canonicalUrl)}` : '';
+        const pubParam = publicationUri ? `&publication=${encodeURIComponent(publicationUri)}` : '';
+        return c.redirect(
+          `/share?document=${encodeURIComponent(documentUri)}&origin=${encodeURIComponent(origin)}&title=${encodeURIComponent('')}${canonicalParam}${pubParam}${tokenParam}`
+        );
+      }
+    }
   }
 
   const external: Record<string, unknown> = {

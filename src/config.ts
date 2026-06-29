@@ -13,6 +13,7 @@ export const OAUTH_SCOPE = [
   'repo:site.standard.graph.recommend?action=create',
   'repo:site.standard.graph.subscription?action=create',
   'repo:app.bsky.feed.post?action=create',
+  'blob:image/*',
 ].join(' ');
 
 export const SESSION_COOKIE = 'scribe_session';
