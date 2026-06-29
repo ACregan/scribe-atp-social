@@ -38,9 +38,16 @@ export async function handleCallback(c: Context) {
   }
 
   const tokenParam = pending.token ? `&token=${encodeURIComponent(pending.token)}` : '';
-  const redirectPath = pending.action === 'recommend'
-    ? `/recommend?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`
-    : `/subscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
+  let redirectPath: string;
+  if (pending.action === 'recommend') {
+    redirectPath = `/recommend?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
+  } else if (pending.action === 'subscribe') {
+    redirectPath = `/subscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
+  } else {
+    const canonicalParam = pending.canonicalUrl ? `&canonicalUrl=${encodeURIComponent(pending.canonicalUrl)}` : '';
+    const pubParam = pending.publication ? `&publication=${encodeURIComponent(pending.publication)}` : '';
+    redirectPath = `/share?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${canonicalParam}${pubParam}${tokenParam}`;
+  }
 
   return c.redirect(redirectPath);
 }

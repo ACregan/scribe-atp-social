@@ -3,7 +3,7 @@ import { Agent } from '@atproto/api';
 import { ALLOWED_ORIGINS } from '../config.js';
 import { getSessionDid } from '../auth.js';
 import { oauthClient } from '../oauth.js';
-import { completionTokens } from '../db.js';
+import { completionTokens, actionEvents } from '../db.js';
 import { handleForm, confirmPage, alreadyActioned, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -137,6 +137,7 @@ export async function handleRecommendPost(c: Context) {
     return c.html(errorPage(`Could not create record: ${message}`));
   }
 
+  actionEvents.log('recommend', documentUri, did);
   if (token) completionTokens.store(token, 'recommend');
 
   return c.html(successPage({ action: 'recommend', origin }));
