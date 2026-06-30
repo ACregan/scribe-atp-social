@@ -68,17 +68,20 @@ function migrate(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS action_events_subject
       ON action_events (action_type, subject_uri);
-
-    CREATE INDEX IF NOT EXISTS action_events_publication
-      ON action_events (publication_uri);
-
-    CREATE INDEX IF NOT EXISTS action_events_document
-      ON action_events (document_uri);
   `);
 
-  // Add columns to existing databases that pre-date this schema
+  // Add columns to existing databases that pre-date this schema — must run
+  // before the indexes on those columns are created below.
   for (const col of ['document_uri TEXT', 'publication_uri TEXT', 'origin TEXT']) {
     try { db.exec(`ALTER TABLE action_events ADD COLUMN ${col}`); } catch { /* already exists */ }
+  }
+
+  // Indexes on the columns added above — kept separate so they run after ALTER TABLE.
+  for (const stmt of [
+    'CREATE INDEX IF NOT EXISTS action_events_publication ON action_events (publication_uri)',
+    'CREATE INDEX IF NOT EXISTS action_events_document ON action_events (document_uri)',
+  ]) {
+    try { db.exec(stmt); } catch { /* already exists */ }
   }
 
   // Backfill existing rows from subject_uri
