@@ -215,7 +215,7 @@ export async function handleSharePost(c: Context) {
     return c.html(errorPage(`Could not create post: ${message}`));
   }
 
-  actionEvents.log('share', documentUri, did);
+  actionEvents.log({ actionType: 'share', documentUri, publicationUri, origin, did });
   if (token) completionTokens.store(token, 'share');
 
   return c.html(successPage({ action: 'share', origin }));

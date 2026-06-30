@@ -68,6 +68,7 @@ export function confirmPage(opts: {
   origin: string;
   title: string;
   token?: string;
+  publication?: string;
 }) {
   const heading = opts.action === 'recommend'
     ? (opts.title ? `Like "${opts.title}"` : 'Like this article')
@@ -109,6 +110,7 @@ export function confirmPage(opts: {
       <input type="hidden" name="${hiddenName}" value="${opts.uri}">
       <input type="hidden" name="origin" value="${opts.origin}">
       ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
+      ${opts.publication && opts.action === 'recommend' ? html`<input type="hidden" name="publication" value="${opts.publication}">` : ''}
       <div class="actions">
         <button type="button" onclick="window.close()">Cancel</button>
         <button type="submit">${buttonText}</button>

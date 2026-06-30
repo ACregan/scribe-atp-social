@@ -43,6 +43,7 @@ export async function handleRecommend(c: Context) {
   const origin = c.req.query('origin') ?? '';
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
+  const publication = c.req.query('publication') || undefined;
 
   if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
     return c.text('Invalid origin', 400);
@@ -63,6 +64,7 @@ export async function handleRecommend(c: Context) {
         origin,
         title,
         token,
+        publication,
       })
     );
   }
@@ -79,6 +81,7 @@ export async function handleRecommend(c: Context) {
         origin,
         title,
         token,
+        publication,
         error: 'Your session expired. Please sign in again.',
       })
     );
@@ -90,12 +93,13 @@ export async function handleRecommend(c: Context) {
     return c.html(alreadyActioned({ action: 'recommend', title }));
   }
 
-  return c.html(confirmPage({ action: 'recommend', handle, uri: documentUri, origin, title, token }));
+  return c.html(confirmPage({ action: 'recommend', handle, uri: documentUri, origin, title, token, publication }));
 }
 
 export async function handleRecommendPost(c: Context) {
   const body = await c.req.parseBody();
   const documentUri = (body.document as string) ?? '';
+  const publicationUri = (body.publication as string) || undefined;
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
@@ -137,7 +141,7 @@ export async function handleRecommendPost(c: Context) {
     return c.html(errorPage(`Could not create record: ${message}`));
   }
 
-  actionEvents.log('recommend', documentUri, did);
+  actionEvents.log({ actionType: 'recommend', documentUri, publicationUri, origin, did });
   if (token) completionTokens.store(token, 'recommend');
 
   return c.html(successPage({ action: 'recommend', origin }));

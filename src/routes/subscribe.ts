@@ -137,7 +137,7 @@ export async function handleSubscribePost(c: Context) {
     return c.html(errorPage(`Could not create record: ${message}`));
   }
 
-  actionEvents.log('subscribe', publicationUri, did);
+  actionEvents.log({ actionType: 'subscribe', publicationUri, origin, did });
   if (token) completionTokens.store(token, 'subscribe');
 
   return c.html(successPage({ action: 'subscribe', origin }));

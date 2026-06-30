@@ -56,15 +56,37 @@ function migrate(db: Database.Database) {
     );
 
     CREATE TABLE IF NOT EXISTS action_events (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      action_type  TEXT    NOT NULL,
-      subject_uri  TEXT    NOT NULL,
-      did          TEXT    NOT NULL,
-      created_at   INTEGER NOT NULL DEFAULT (unixepoch())
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      action_type      TEXT    NOT NULL,
+      subject_uri      TEXT    NOT NULL,
+      document_uri     TEXT,
+      publication_uri  TEXT,
+      origin           TEXT,
+      did              TEXT    NOT NULL,
+      created_at       INTEGER NOT NULL DEFAULT (unixepoch())
     );
 
     CREATE INDEX IF NOT EXISTS action_events_subject
       ON action_events (action_type, subject_uri);
+
+    CREATE INDEX IF NOT EXISTS action_events_publication
+      ON action_events (publication_uri);
+
+    CREATE INDEX IF NOT EXISTS action_events_document
+      ON action_events (document_uri);
+  `);
+
+  // Add columns to existing databases that pre-date this schema
+  for (const col of ['document_uri TEXT', 'publication_uri TEXT', 'origin TEXT']) {
+    try { db.exec(`ALTER TABLE action_events ADD COLUMN ${col}`); } catch { /* already exists */ }
+  }
+
+  // Backfill existing rows from subject_uri
+  db.exec(`
+    UPDATE action_events SET document_uri = subject_uri
+      WHERE action_type IN ('recommend', 'share') AND document_uri IS NULL;
+    UPDATE action_events SET publication_uri = subject_uri
+      WHERE action_type = 'subscribe' AND publication_uri IS NULL;
   `);
 }
 
@@ -161,10 +183,19 @@ export const completionTokens = {
 };
 
 export const actionEvents = {
-  log: (actionType: string, subjectUri: string, did: string) => {
+  log: (opts: {
+    actionType: string;
+    documentUri?: string | null;
+    publicationUri?: string | null;
+    origin: string;
+    did: string;
+  }) => {
+    const subjectUri = opts.documentUri ?? opts.publicationUri ?? '';
     db.prepare(
-      'INSERT INTO action_events (action_type, subject_uri, did) VALUES (?, ?, ?)'
-    ).run(actionType, subjectUri, did);
+      `INSERT INTO action_events
+         (action_type, subject_uri, document_uri, publication_uri, origin, did)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(opts.actionType, subjectUri, opts.documentUri ?? null, opts.publicationUri ?? null, opts.origin, opts.did);
   },
 };
 
