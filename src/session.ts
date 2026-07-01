@@ -10,7 +10,7 @@ if (process.env.SESSION_SECRET.length < 32) {
 const SECRET = process.env.SESSION_SECRET;
 
 export interface PendingData {
-  action: 'recommend' | 'subscribe' | 'share';
+  action: 'recommend' | 'subscribe' | 'unsubscribe' | 'share';
   uri: string;
   origin: string;
   title: string;

@@ -43,6 +43,8 @@ export async function handleCallback(c: Context) {
     redirectPath = `/recommend?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
   } else if (pending.action === 'subscribe') {
     redirectPath = `/subscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
+  } else if (pending.action === 'unsubscribe') {
+    redirectPath = `/unsubscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
   } else {
     const canonicalParam = pending.canonicalUrl ? `&canonicalUrl=${encodeURIComponent(pending.canonicalUrl)}` : '';
     const pubParam = pending.publication ? `&publication=${encodeURIComponent(pending.publication)}` : '';
