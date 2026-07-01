@@ -3,7 +3,7 @@ import { html } from 'hono/html';
 export function handleForm(opts: {
   heading: string;
   subtitle: string;
-  action: 'recommend' | 'subscribe' | 'share';
+  action: 'recommend' | 'subscribe' | 'unsubscribe' | 'share';
   uri: string;
   origin: string;
   title: string;
@@ -218,13 +218,17 @@ export function shareConfirmPage(opts: {
 }
 
 export function successPage(opts: {
-  action: 'recommend' | 'subscribe' | 'share';
+  action: 'recommend' | 'subscribe' | 'unsubscribe' | 'share';
   origin: string;
 }) {
-  const heading = opts.action === 'recommend' ? 'Liked ✓' : opts.action === 'subscribe' ? 'Subscribed ✓' : 'Shared ✓';
-  const message = opts.action === 'recommend'
-    ? 'Thanks for the like!'
-    : opts.action === 'subscribe' ? 'Thanks for subscribing!' : 'Thanks for sharing!';
+  const heading = opts.action === 'recommend' ? 'Liked ✓'
+    : opts.action === 'subscribe' ? 'Subscribed ✓'
+    : opts.action === 'unsubscribe' ? 'Unsubscribed'
+    : 'Shared ✓';
+  const message = opts.action === 'recommend' ? 'Thanks for the like!'
+    : opts.action === 'subscribe' ? 'Thanks for subscribing!'
+    : opts.action === 'unsubscribe' ? 'You have been unsubscribed.'
+    : 'Thanks for sharing!';
 
   return html`<!DOCTYPE html>
 <html lang="en">
@@ -253,6 +257,56 @@ export function successPage(opts: {
     } catch (_) {}
     setTimeout(() => window.close(), 1200);
   </script>
+</body>
+</html>`;
+}
+
+export function unsubscribeConfirmPage(opts: {
+  handle: string;
+  publicationUri: string;
+  origin: string;
+  title: string;
+  token?: string;
+}) {
+  const heading = opts.title ? `Unsubscribe from ${opts.title}?` : 'Unsubscribe?';
+
+  return html`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${heading} — Scribe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
+           min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .card { background: #fff; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center; }
+    h1 { font-size: 1.2rem; margin-bottom: 0.5rem; color: #111; }
+    .handle { color: #555; font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .actions { display: flex; gap: 0.75rem; }
+    button { flex: 1; padding: 0.625rem; border: none; border-radius: 8px;
+             font-size: 1rem; font-weight: 600; cursor: pointer; }
+    button[type="submit"] { background: #d32f2f; color: #fff; }
+    button[type="submit"]:hover { background: #b71c1c; }
+    button[type="button"] { background: #eee; color: #333; }
+    button[type="button"]:hover { background: #ddd; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>${heading}</h1>
+    <p class="handle">as @${opts.handle}</p>
+    <form method="POST" action="/unsubscribe">
+      <input type="hidden" name="publication" value="${opts.publicationUri}">
+      <input type="hidden" name="origin" value="${opts.origin}">
+      ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
+      <div class="actions">
+        <button type="button" onclick="window.close()">Cancel</button>
+        <button type="submit">Unsubscribe</button>
+      </div>
+    </form>
+  </div>
 </body>
 </html>`;
 }

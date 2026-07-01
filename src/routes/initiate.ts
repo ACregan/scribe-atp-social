@@ -23,7 +23,7 @@ export async function handleInitiate(c: Context) {
     return c.html(errorPage('Invalid origin.'), 400);
   }
 
-  if (action !== 'recommend' && action !== 'subscribe' && action !== 'share') {
+  if (action !== 'recommend' && action !== 'subscribe' && action !== 'unsubscribe' && action !== 'share') {
     return c.html(errorPage('Invalid action.'), 400);
   }
 
@@ -31,17 +31,23 @@ export async function handleInitiate(c: Context) {
     return c.html(errorPage('Invalid URI.'), 400);
   }
 
-  const headingMap = { recommend: `Like "${title}"`, subscribe: `Subscribe to ${title}`, share: `Share "${title}"` };
+  const headingMap = {
+    recommend: `Like "${title}"`,
+    subscribe: `Subscribe to ${title}`,
+    unsubscribe: `Unsubscribe from ${title}`,
+    share: `Share "${title}"`,
+  };
   const subtitleMap = {
     recommend: 'Sign in with your Bluesky account to like this article.',
     subscribe: 'Sign in with your Bluesky account to subscribe.',
+    unsubscribe: 'Sign in with your Bluesky account to confirm your unsubscription.',
     share: 'Sign in with your Bluesky account to share this article.',
   };
 
   const formOpts = {
     heading: headingMap[action as keyof typeof headingMap],
     subtitle: subtitleMap[action as keyof typeof subtitleMap],
-    action: action as 'recommend' | 'subscribe' | 'share',
+    action: action as 'recommend' | 'subscribe' | 'unsubscribe' | 'share',
     uri,
     origin,
     title,
