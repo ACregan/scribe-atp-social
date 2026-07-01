@@ -124,7 +124,9 @@ export function confirmPage(opts: {
 export function alreadyActioned(opts: {
   action: 'recommend' | 'subscribe';
   title: string;
+  origin: string;
 }) {
+  const heading = opts.action === 'recommend' ? 'Already liked ✓' : 'Already subscribed ✓';
   const message = opts.action === 'recommend'
     ? (opts.title ? `You already liked "${opts.title}".` : 'You already liked this article.')
     : (opts.title ? `You are already subscribed to ${opts.title}.` : 'You are already subscribed.');
@@ -141,19 +143,21 @@ export function alreadyActioned(opts: {
            min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
     .card { background: #fff; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center; }
-    h1 { font-size: 1.2rem; margin-bottom: 0.75rem; color: #111; }
-    p { color: #555; font-size: 0.875rem; line-height: 1.5; margin-bottom: 1.5rem; }
-    button { padding: 0.625rem 1.5rem; background: #0085ff; color: #fff; border: none;
-             border-radius: 8px; font-size: 1rem; cursor: pointer; }
-    button:hover { background: #006ed4; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.75rem; color: #111; }
+    p { color: #555; font-size: 0.875rem; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>${opts.action === 'recommend' ? 'Already liked ✓' : 'Already subscribed ✓'}</h1>
+    <h1>${heading}</h1>
     <p>${message}</p>
-    <button onclick="window.close()">Close</button>
   </div>
+  <script>
+    try {
+      window.opener.postMessage({ ok: true, action: ${JSON.stringify(opts.action)} }, ${JSON.stringify(opts.origin)});
+    } catch (_) {}
+    setTimeout(() => window.close(), 1200);
+  </script>
 </body>
 </html>`;
 }

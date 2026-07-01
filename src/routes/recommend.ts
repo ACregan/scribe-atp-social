@@ -90,7 +90,7 @@ export async function handleRecommend(c: Context) {
   const { agent, handle } = result;
 
   if (await hasExistingRecommend(agent, did, documentUri)) {
-    return c.html(alreadyActioned({ action: 'recommend', title }));
+    return c.html(alreadyActioned({ action: 'recommend', title, origin }));
   }
 
   return c.html(confirmPage({ action: 'recommend', handle, uri: documentUri, origin, title, token, publication }));
@@ -123,7 +123,7 @@ export async function handleRecommendPost(c: Context) {
   const { agent } = result;
 
   if (await hasExistingRecommend(agent, did, documentUri)) {
-    return c.html(alreadyActioned({ action: 'recommend', title: '' }));
+    return c.html(alreadyActioned({ action: 'recommend', title: '', origin }));
   }
 
   try {

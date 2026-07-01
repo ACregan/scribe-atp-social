@@ -87,7 +87,7 @@ export async function handleSubscribe(c: Context) {
   const { agent, handle } = result;
 
   if (await hasExistingSubscription(agent, did, publicationUri)) {
-    return c.html(alreadyActioned({ action: 'subscribe', title }));
+    return c.html(alreadyActioned({ action: 'subscribe', title, origin }));
   }
 
   return c.html(confirmPage({ action: 'subscribe', handle, uri: publicationUri, origin, title, token }));
@@ -119,7 +119,7 @@ export async function handleSubscribePost(c: Context) {
   const { agent } = result;
 
   if (await hasExistingSubscription(agent, did, publicationUri)) {
-    return c.html(alreadyActioned({ action: 'subscribe', title: '' }));
+    return c.html(alreadyActioned({ action: 'subscribe', title: '', origin }));
   }
 
   try {
