@@ -7,6 +7,7 @@ import { handleShare, handleSharePost } from './routes/share.js';
 import { handleInitiate } from './routes/initiate.js';
 import { handleCallback } from './routes/callback.js';
 import { handleStatus } from './routes/status.js';
+import { handleNotify } from './routes/notify.js';
 
 export const app = new Hono();
 
@@ -23,4 +24,5 @@ app.post('/initiate', handleInitiate);
 app.get('/callback', handleCallback);
 
 app.get('/status/:token', handleStatus);
+app.post('/notify', handleNotify);
 app.get('/health', (c) => c.json({ ok: true }));
