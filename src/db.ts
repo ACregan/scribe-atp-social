@@ -80,6 +80,8 @@ function migrate(db: Database.Database) {
   for (const stmt of [
     'CREATE INDEX IF NOT EXISTS action_events_publication ON action_events (publication_uri)',
     'CREATE INDEX IF NOT EXISTS action_events_document ON action_events (document_uri)',
+    'CREATE INDEX IF NOT EXISTS action_events_pub_type_time ON action_events (publication_uri, action_type, created_at)',
+    'CREATE INDEX IF NOT EXISTS action_events_type_time ON action_events (action_type, created_at)',
   ]) {
     try { db.exec(stmt); } catch { /* already exists */ }
   }
