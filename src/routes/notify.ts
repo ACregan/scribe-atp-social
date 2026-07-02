@@ -94,22 +94,25 @@ export async function handleNotify(c: Context) {
   const prefix = siteTitle ? `New article from ${siteTitle}: ` : 'New article: ';
   const messageText = `${prefix}"${articleTitle}"\n${canonicalUrl}\n\nTo unsubscribe: ${unsubscribeUrl}`;
 
+  const authorDid = agent.session?.did ?? '';
   let sent = 0;
   let skipped = 0;
 
   // Fire and forget — attempt all, log failures, no retry
   await Promise.allSettled(
-    subscriberDids.map(async (did) => {
-      try {
-        const convoId = await getOrCreateConvoId(agent, did);
-        await sendDm(agent, convoId, messageText);
-        sent++;
-        console.log(`[notify] DM sent to ${did}`);
-      } catch (err) {
-        skipped++;
-        console.warn(`[notify] DM failed for ${did}:`, String(err));
-      }
-    })
+    subscriberDids
+      .filter((did) => did !== authorDid)
+      .map(async (did) => {
+        try {
+          const convoId = await getOrCreateConvoId(agent, did);
+          await sendDm(agent, convoId, messageText);
+          sent++;
+          console.log(`[notify] DM sent to ${did}`);
+        } catch (err) {
+          skipped++;
+          console.warn(`[notify] DM failed for ${did}:`, String(err));
+        }
+      })
   );
 
   return c.json({ ok: true, sent, skipped });

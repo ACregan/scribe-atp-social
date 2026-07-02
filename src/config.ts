@@ -4,6 +4,7 @@ export const ALLOWED_ORIGINS = [
   'https://www.anthonycregan.co.uk',
   'https://perpetualsummer.ltd',
   'https://www.perpetualsummer.ltd',
+  'https://scribe-cms.app',
 ] as const;
 
 export type AllowedOrigin = (typeof ALLOWED_ORIGINS)[number];
