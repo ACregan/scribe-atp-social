@@ -110,6 +110,9 @@ export const db = getDb();
 pruneStaleState(db);
 pruneStaleInitiateAttempts(db);
 pruneStaleCompletionTokens(db);
+pruneStaleUnsubscribeEvents(db);
+pruneStaleOAuthSessions(db);
+pruneStaleUserSessions(db);
 
 export const oauthStateStore = {
   get: (key: string) => {
@@ -171,6 +174,27 @@ export const sessionStore = {
 
 function pruneStaleCompletionTokens(db: Database.Database) {
   db.prepare('DELETE FROM completion_tokens WHERE created_at < unixepoch() - 3600').run();
+}
+
+// GDPR retention policy — 90-day limit on inactive personal data.
+const NINETY_DAYS = 90 * 24 * 60 * 60;
+
+// Unsubscribe events are logged for auditing then become stale — the PDS record
+// is already deleted, so there is no active subscription to track.
+function pruneStaleUnsubscribeEvents(db: Database.Database) {
+  db.prepare(
+    "DELETE FROM action_events WHERE action_type = 'unsubscribe' AND created_at < unixepoch() - ?"
+  ).run(NINETY_DAYS);
+}
+
+// OAuth sessions inactive for 90+ days — updated_at reflects last token refresh.
+function pruneStaleOAuthSessions(db: Database.Database) {
+  db.prepare('DELETE FROM oauth_session WHERE updated_at < unixepoch() - ?').run(NINETY_DAYS);
+}
+
+// User sessions (scribe_session cookie) inactive for 90+ days.
+function pruneStaleUserSessions(db: Database.Database) {
+  db.prepare('DELETE FROM sessions WHERE last_used_at < unixepoch() - ?').run(NINETY_DAYS);
 }
 
 export const completionTokens = {
