@@ -36,6 +36,9 @@ export function handleForm(opts: {
     button[type="submit"]:hover { background: #006ed4; }
     .error { color: #b00020; background: #fff0f0; border: 1px solid #ffcdd2; border-radius: 8px;
              padding: 0.75rem 1rem; font-size: 0.875rem; margin-bottom: 1rem; }
+    .privacy { margin-top: 1.25rem; text-align: center; font-size: 0.75rem; color: #999; }
+    .privacy a { color: #999; text-decoration: underline; }
+    .privacy a:hover { color: #555; }
   </style>
 </head>
 <body>
@@ -56,6 +59,7 @@ export function handleForm(opts: {
              autocomplete="username" required autofocus>
       <button type="submit">Continue with Bluesky</button>
     </form>
+    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
@@ -100,6 +104,9 @@ export function confirmPage(opts: {
     button[type="submit"]:hover { background: #006ed4; }
     button[type="button"] { background: #eee; color: #333; }
     button[type="button"]:hover { background: #ddd; }
+    .privacy { margin-top: 1.25rem; text-align: center; font-size: 0.75rem; color: #999; }
+    .privacy a { color: #999; text-decoration: underline; }
+    .privacy a:hover { color: #555; }
   </style>
 </head>
 <body>
@@ -116,6 +123,7 @@ export function confirmPage(opts: {
         <button type="submit">${buttonText}</button>
       </div>
     </form>
+    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
@@ -197,6 +205,9 @@ export function shareConfirmPage(opts: {
     button[type="submit"]:hover { background: #006ed4; }
     button[type="button"] { background: #eee; color: #333; }
     button[type="button"]:hover { background: #ddd; }
+    .privacy { margin-top: 1.25rem; text-align: center; font-size: 0.75rem; color: #999; }
+    .privacy a { color: #999; text-decoration: underline; }
+    .privacy a:hover { color: #555; }
   </style>
 </head>
 <body>
@@ -216,6 +227,7 @@ export function shareConfirmPage(opts: {
         <button type="submit">Share</button>
       </div>
     </form>
+    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
@@ -295,6 +307,9 @@ export function unsubscribeConfirmPage(opts: {
     button[type="submit"]:hover { background: #b71c1c; }
     button[type="button"] { background: #eee; color: #333; }
     button[type="button"]:hover { background: #ddd; }
+    .privacy { margin-top: 1.25rem; text-align: center; font-size: 0.75rem; color: #999; }
+    .privacy a { color: #999; text-decoration: underline; }
+    .privacy a:hover { color: #555; }
   </style>
 </head>
 <body>
@@ -310,6 +325,7 @@ export function unsubscribeConfirmPage(opts: {
         <button type="submit">Unsubscribe</button>
       </div>
     </form>
+    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
