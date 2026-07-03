@@ -35,6 +35,7 @@ export function handleCounts(c: Context) {
 
   const publicationUri = q['publication_uri'];
   const documentUri = q['document_uri'];
+  const origin = q['origin'];
   const groupBy = q['group_by'];
   const orderBy = q['order_by'] ?? 'count';
   const limit = Math.min(100, Math.max(1, parseInt(q['limit'] ?? '10', 10) || 10));
@@ -44,6 +45,9 @@ export function handleCounts(c: Context) {
   }
   if (documentUri && !documentUri.startsWith('at://')) {
     return c.json({ ok: false, error: 'document_uri must be an AT URI' }, 400);
+  }
+  if (origin && !/^https?:\/\//.test(origin)) {
+    return c.json({ ok: false, error: 'origin must be an http/https URL' }, 400);
   }
   if (groupBy && !VALID_GROUP_BY.has(groupBy)) {
     return c.json({ ok: false, error: 'group_by must be one of: document_uri, did, day' }, 400);
@@ -66,6 +70,7 @@ export function handleCounts(c: Context) {
 
   if (publicationUri) { conditions.push('publication_uri = ?'); params.push(publicationUri); }
   if (documentUri)    { conditions.push('document_uri = ?');    params.push(documentUri); }
+  if (origin)         { conditions.push('origin = ?');          params.push(origin); }
   if (from !== null)  { conditions.push('created_at >= ?');     params.push(from); }
   conditions.push('created_at <= ?'); params.push(to);
 
