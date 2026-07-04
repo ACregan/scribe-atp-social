@@ -7,6 +7,8 @@ export function parseDate(value: string, fallback: number): number {
     const days = parseInt(rel[1], 10);
     return Math.floor(Date.now() / 1000) - days * 86400;
   }
+  // Plain integer — treat as Unix timestamp in seconds
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
   const ts = Date.parse(value);
   if (!isNaN(ts)) return Math.floor(ts / 1000);
   return fallback;
