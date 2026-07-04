@@ -107,6 +107,9 @@ function pruneStaleInitiateAttempts(db: Database.Database) {
 
 export const db = getDb();
 
+// GDPR retention policy — 90-day limit on inactive personal data.
+const NINETY_DAYS = 90 * 24 * 60 * 60;
+
 pruneStaleState(db);
 pruneStaleInitiateAttempts(db);
 pruneStaleCompletionTokens(db);
@@ -175,9 +178,6 @@ export const sessionStore = {
 function pruneStaleCompletionTokens(db: Database.Database) {
   db.prepare('DELETE FROM completion_tokens WHERE created_at < unixepoch() - 3600').run();
 }
-
-// GDPR retention policy — 90-day limit on inactive personal data.
-const NINETY_DAYS = 90 * 24 * 60 * 60;
 
 // Unsubscribe events are logged for auditing then become stale — the PDS record
 // is already deleted, so there is no active subscription to track.
