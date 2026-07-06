@@ -82,6 +82,7 @@ Returns aggregate counts. Public within the CORS allowlist (`norobots.blog`, `an
 | `action_type` | yes | `recommend`, `subscribe`, or `share` |
 | `publication_uri` | no | Filter by publication AT URI |
 | `document_uri` | no | Filter by document AT URI |
+| `origin` | no | Filter to events from a specific origin, e.g. `https://norobots.blog` |
 | `from` | no | Start of window — ISO 8601 or relative (`-7d`, `-14d`, `-30d`) |
 | `to` | no | End of window — ISO 8601 or relative; defaults to now |
 | `group_by` | no | `document_uri`, `did`, or `day` |
