@@ -114,6 +114,7 @@ pruneStaleState(db);
 pruneStaleInitiateAttempts(db);
 pruneStaleCompletionTokens(db);
 pruneStaleUnsubscribeEvents(db);
+pruneStaleEngagementEvents(db);
 pruneStaleOAuthSessions(db);
 pruneStaleUserSessions(db);
 
@@ -184,6 +185,16 @@ function pruneStaleCompletionTokens(db: Database.Database) {
 function pruneStaleUnsubscribeEvents(db: Database.Database) {
   db.prepare(
     "DELETE FROM action_events WHERE action_type = 'unsubscribe' AND created_at < unixepoch() - ?"
+  ).run(NINETY_DAYS);
+}
+
+// Recommend and share events — one-off actions containing reader DIDs. Retained
+// for 90 days for analytics (within the /counts query cap), then pruned.
+// Subscribe events are deliberately excluded: active subscriptions must be kept
+// for the /notify fan-out query.
+function pruneStaleEngagementEvents(db: Database.Database) {
+  db.prepare(
+    "DELETE FROM action_events WHERE action_type IN ('recommend', 'share') AND created_at < unixepoch() - ?"
   ).run(NINETY_DAYS);
 }
 
