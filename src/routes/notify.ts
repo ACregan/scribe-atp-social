@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { AtpAgent } from '@atproto/api';
 import { db } from '../db.js';
+import { verifyBearerSecret } from '../session.js';
 
 interface NotifyBody {
   publicationUri?: unknown;
@@ -45,8 +46,7 @@ async function sendDm(agent: AtpAgent, convoId: string, text: string): Promise<v
 
 export async function handleNotify(c: Context) {
   const authHeader = c.req.header('Authorization') ?? '';
-  const secret = process.env.NOTIFY_SECRET;
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!verifyBearerSecret(authHeader, process.env.NOTIFY_SECRET)) {
     return c.json({ ok: false, error: 'Unauthorized' }, 401);
   }
 

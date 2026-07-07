@@ -1,13 +1,13 @@
 import type { Context } from 'hono';
 import { db } from '../db.js';
 import { parseDate, validateDateRange } from '../utils/parseDate.js';
+import { verifyBearerSecret } from '../session.js';
 
 const VALID_ACTION_TYPES = new Set(['recommend', 'subscribe', 'share']);
 
 export function handleEvents(c: Context) {
   const authHeader = c.req.header('Authorization') ?? '';
-  const secret = process.env.NOTIFY_SECRET;
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!verifyBearerSecret(authHeader, process.env.NOTIFY_SECRET)) {
     return c.json({ ok: false, error: 'Unauthorized' }, 401);
   }
 

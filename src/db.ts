@@ -3,13 +3,15 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { RATE_LIMIT_WINDOW, RATE_LIMIT_MAX } from './config.js';
 
-const DB_PATH = path.resolve(process.cwd(), 'data/social.db');
+// Overridable so tests can point at an isolated `:memory:` database instead
+// of the real one on disk (see test/setup.ts).
+const DB_PATH = process.env.SOCIAL_DB_PATH ?? path.resolve(process.cwd(), 'data/social.db');
 
 let _db: Database.Database | undefined;
 
 function getDb(): Database.Database {
   if (!_db) {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+    if (DB_PATH !== ':memory:') fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
     _db = new Database(DB_PATH);
     _db.pragma('journal_mode = WAL');
   }

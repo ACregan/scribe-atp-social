@@ -31,6 +31,16 @@ function safeEqual(a: string, b: string): boolean {
   }
 }
 
+// Shared by /notify and /events — both previously compared the Authorization
+// header with plain `!==`, which leaks timing information about how many
+// leading bytes of the secret matched. Every other secret comparison in this
+// service (session/pending signatures) already used timingSafeEqual; this
+// closes the one inconsistency.
+export function verifyBearerSecret(authHeader: string, secret: string | undefined): boolean {
+  if (!secret) return false;
+  return safeEqual(authHeader, `Bearer ${secret}`);
+}
+
 export function signSessionId(id: string): string {
   return `${id}.${hmac(id)}`;
 }
