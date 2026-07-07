@@ -4,6 +4,7 @@ default:
 
 stages:
   - typecheck
+  - test
   - deploy
 
 typecheck:
@@ -19,6 +20,26 @@ typecheck:
   script:
     - npm ci
     - npm run typecheck
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/*.ts"
+        - "**/*.json"
+        - ".gitlab-ci.yml"
+
+test:
+  stage: test
+  image: node:22
+  interruptible: true
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+  script:
+    - npm ci
+    - npm run test:run
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:

@@ -1,0 +1,76 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { db, initiateAttempts, sessionStore } from './db.js';
+
+// Each test file gets its own fresh `:memory:` database (see test/setup.ts),
+// but tests within this file share one instance, so clear relevant tables
+// between tests rather than relying on isolation across `it` blocks.
+beforeEach(() => {
+  db.exec('DELETE FROM initiate_attempts');
+  db.exec('DELETE FROM sessions');
+});
+
+describe('initiateAttempts — 5 attempts / 15 minutes per IP', () => {
+  it('is not limited before any attempts are recorded', () => {
+    expect(initiateAttempts.isLimited('1.2.3.4')).toBe(false);
+    expect(initiateAttempts.count('1.2.3.4')).toBe(0);
+  });
+
+  it('counts attempts per IP independently', () => {
+    initiateAttempts.record('1.2.3.4');
+    initiateAttempts.record('1.2.3.4');
+    initiateAttempts.record('5.6.7.8');
+    expect(initiateAttempts.count('1.2.3.4')).toBe(2);
+    expect(initiateAttempts.count('5.6.7.8')).toBe(1);
+  });
+
+  it('is not limited at exactly 4 attempts (max is 5)', () => {
+    for (let i = 0; i < 4; i++) initiateAttempts.record('1.2.3.4');
+    expect(initiateAttempts.isLimited('1.2.3.4')).toBe(false);
+  });
+
+  it('becomes limited once 5 attempts are recorded within the window', () => {
+    for (let i = 0; i < 5; i++) initiateAttempts.record('1.2.3.4');
+    expect(initiateAttempts.isLimited('1.2.3.4')).toBe(true);
+  });
+
+  it('excludes attempts older than the 15-minute window', () => {
+    const staleTimestamp = Math.floor(Date.now() / 1000) - 901; // just past 900s window
+    for (let i = 0; i < 5; i++) {
+      db.prepare('INSERT INTO initiate_attempts (ip, created_at) VALUES (?, ?)').run(
+        '9.9.9.9',
+        staleTimestamp,
+      );
+    }
+    expect(initiateAttempts.count('9.9.9.9')).toBe(0);
+    expect(initiateAttempts.isLimited('9.9.9.9')).toBe(false);
+  });
+
+  it('counts attempts still inside the window', () => {
+    const recentTimestamp = Math.floor(Date.now() / 1000) - 100;
+    for (let i = 0; i < 5; i++) {
+      db.prepare('INSERT INTO initiate_attempts (ip, created_at) VALUES (?, ?)').run(
+        '9.9.9.9',
+        recentTimestamp,
+      );
+    }
+    expect(initiateAttempts.count('9.9.9.9')).toBe(5);
+    expect(initiateAttempts.isLimited('9.9.9.9')).toBe(true);
+  });
+});
+
+describe('sessionStore', () => {
+  it('creates a session and reads back the same did', () => {
+    const id = sessionStore.create('did:plc:abc123');
+    expect(sessionStore.get(id)).toBe('did:plc:abc123');
+  });
+
+  it('returns undefined for an unknown session id', () => {
+    expect(sessionStore.get('does-not-exist')).toBeUndefined();
+  });
+
+  it('deletes a session so it can no longer be read', () => {
+    const id = sessionStore.create('did:plc:abc123');
+    sessionStore.delete(id);
+    expect(sessionStore.get(id)).toBeUndefined();
+  });
+});
