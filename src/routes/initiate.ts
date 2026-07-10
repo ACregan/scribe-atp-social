@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
-import { ALLOWED_ORIGINS, PENDING_COOKIE, PENDING_MAX_AGE } from '../config.js';
-import { initiateAttempts } from '../db.js';
+import { PENDING_COOKIE, PENDING_MAX_AGE } from '../config.js';
+import { allowedOrigins, initiateAttempts } from '../db.js';
 import { oauthClient, OAUTH_SCOPE } from '../oauth.js';
 import { encodePending, type PendingData } from '../session.js';
 import { getClientIp } from '../auth.js';
@@ -19,7 +19,7 @@ export async function handleInitiate(c: Context) {
   const canonicalUrl = (body.canonicalUrl as string) || undefined;
   const publication = (body.publication as string) || undefined;
 
-  if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
+  if (!allowedOrigins.isAllowed(origin)) {
     return c.html(errorPage('Invalid origin.'), 400);
   }
 

@@ -11,7 +11,8 @@ import { handleStatus } from './routes/status.js';
 import { handleNotify } from './routes/notify.js';
 import { handleEvents } from './routes/events.js';
 import { handleCounts } from './routes/counts.js';
-import { ALLOWED_ORIGINS } from './config.js';
+import { handleAddOrigin } from './routes/origins.js';
+import { allowedOrigins } from './db.js';
 
 export const app = new Hono();
 
@@ -29,7 +30,11 @@ app.get('/callback', handleCallback);
 
 app.get('/status/:token', handleStatus);
 app.post('/notify', handleNotify);
+app.post('/origins', handleAddOrigin);
 app.get('/events', handleEvents);
-app.use('/counts', cors({ origin: [...ALLOWED_ORIGINS] }));
+app.use(
+  '/counts',
+  cors({ origin: (origin) => (allowedOrigins.isAllowed(origin) ? origin : undefined) })
+);
 app.get('/counts', handleCounts);
 app.get('/health', (c) => c.json({ ok: true }));
