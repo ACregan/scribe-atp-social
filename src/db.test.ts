@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { db, initiateAttempts, sessionStore } from './db.js';
+import { db, initiateAttempts, sessionStore, allowedOrigins } from './db.js';
 
 // Each test file gets its own fresh `:memory:` database (see test/setup.ts),
 // but tests within this file share one instance, so clear relevant tables
@@ -7,6 +7,7 @@ import { db, initiateAttempts, sessionStore } from './db.js';
 beforeEach(() => {
   db.exec('DELETE FROM initiate_attempts');
   db.exec('DELETE FROM sessions');
+  db.exec("DELETE FROM allowed_origins WHERE origin = 'https://db-test.example'");
 });
 
 describe('initiateAttempts — 5 attempts / 15 minutes per IP', () => {
@@ -55,6 +56,38 @@ describe('initiateAttempts — 5 attempts / 15 minutes per IP', () => {
     }
     expect(initiateAttempts.count('9.9.9.9')).toBe(5);
     expect(initiateAttempts.isLimited('9.9.9.9')).toBe(true);
+  });
+});
+
+describe('allowedOrigins', () => {
+  it('add() works with no owner_did (legacy-seed shape)', () => {
+    allowedOrigins.add('https://db-test.example');
+    expect(allowedOrigins.isAllowed('https://db-test.example')).toBe(true);
+    const row = db
+      .prepare<string, { owner_did: string | null }>(
+        'SELECT owner_did FROM allowed_origins WHERE origin = ?',
+      )
+      .get('https://db-test.example');
+    expect(row?.owner_did).toBeNull();
+  });
+
+  it('add() preserves created_at across a re-registration that updates owner_did', () => {
+    allowedOrigins.add('https://db-test.example', 'did:plc:first');
+    const before = db
+      .prepare<string, { created_at: number }>(
+        'SELECT created_at FROM allowed_origins WHERE origin = ?',
+      )
+      .get('https://db-test.example');
+
+    allowedOrigins.add('https://db-test.example', 'did:plc:second');
+    const after = db
+      .prepare<string, { created_at: number; owner_did: string }>(
+        'SELECT created_at, owner_did FROM allowed_origins WHERE origin = ?',
+      )
+      .get('https://db-test.example');
+
+    expect(after?.created_at).toBe(before?.created_at);
+    expect(after?.owner_did).toBe('did:plc:second');
   });
 });
 

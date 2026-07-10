@@ -1,9 +1,8 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
-import { ALLOWED_ORIGINS } from '../config.js';
 import { getSessionDid } from '../auth.js';
 import { oauthClient } from '../oauth.js';
-import { completionTokens, actionEvents } from '../db.js';
+import { allowedOrigins, completionTokens, actionEvents } from '../db.js';
 import { handleForm, unsubscribeConfirmPage, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -47,7 +46,7 @@ export async function handleUnsubscribe(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
+  if (!allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!publicationUri.startsWith('at://')) {
@@ -97,7 +96,7 @@ export async function handleUnsubscribePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])) {
+  if (!allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!publicationUri.startsWith('at://')) {

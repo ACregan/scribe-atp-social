@@ -70,7 +70,29 @@ function migrate(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS action_events_subject
       ON action_events (action_type, subject_uri);
+
+    CREATE TABLE IF NOT EXISTS allowed_origins (
+      origin     TEXT    PRIMARY KEY,
+      owner_did  TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
   `);
+
+  // Seed the origins that used to be hardcoded in config.ts's ALLOWED_ORIGINS
+  // array, so existing consumer sites don't lose access the moment this
+  // migration first runs. owner_did is unknown for these — the CMS backfills
+  // it going forward via POST /origins whenever a Site's domain is (re)set.
+  const seedOrigin = db.prepare('INSERT OR IGNORE INTO allowed_origins (origin) VALUES (?)');
+  for (const origin of [
+    'https://norobots.blog',
+    'https://anthonycregan.co.uk',
+    'https://www.anthonycregan.co.uk',
+    'https://perpetualsummer.ltd',
+    'https://www.perpetualsummer.ltd',
+    'https://scribe-cms.app',
+  ]) {
+    seedOrigin.run(origin);
+  }
 
   // Add columns to existing databases that pre-date this schema — must run
   // before the indexes on those columns are created below.
@@ -238,6 +260,21 @@ export const actionEvents = {
          (action_type, subject_uri, document_uri, publication_uri, origin, did)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run(opts.actionType, subjectUri, opts.documentUri ?? null, opts.publicationUri ?? null, opts.origin, opts.did);
+  },
+};
+
+export const allowedOrigins = {
+  isAllowed: (origin: string): boolean => {
+    const row = db
+      .prepare<string, { origin: string }>('SELECT origin FROM allowed_origins WHERE origin = ?')
+      .get(origin);
+    return row !== undefined;
+  },
+  add: (origin: string, ownerDid?: string) => {
+    db.prepare(
+      `INSERT INTO allowed_origins (origin, owner_did) VALUES (?, ?)
+         ON CONFLICT(origin) DO UPDATE SET owner_did = excluded.owner_did`
+    ).run(origin, ownerDid ?? null);
   },
 };
 
