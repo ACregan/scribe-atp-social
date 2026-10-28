@@ -23,7 +23,7 @@ Words: a reader **Follows** a Publication and is one of its **Followers**
 | `POST` | `/follow` | session cookie | Create a Follow record on the reader's PDS |
 | `GET` | `/unfollow` | — | Unfollow popup, or the link in a Follower Notification DM (`/unsubscribe` is an alias) |
 | `POST` | `/unfollow` | session cookie | Delete the reader's Follow record |
-| `GET` | `/share` | — | Share popup |
+| `GET` | `/share` | — | Share popup (`quick=1` posts without the compose step, for sites that turn off "Ask before sharing") |
 | `POST` | `/share` | session cookie | Post a link to the reader's Bluesky account |
 | `POST` | `/initiate` | — | Start OAuth sign-in (rate limited: 5/15 min/IP) |
 | `GET` | `/callback` | — | OAuth callback |
