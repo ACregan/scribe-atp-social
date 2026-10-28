@@ -11,6 +11,9 @@ export function handleForm(opts: {
   error?: string;
   canonicalUrl?: string;
   publication?: string;
+  // Share without the compose step (the site turned off "Ask before
+  // sharing", ADR 0097).
+  quick?: boolean;
 }) {
   return html`<!DOCTYPE html>
 <html lang="en">
@@ -54,6 +57,7 @@ export function handleForm(opts: {
       ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
       ${opts.canonicalUrl ? html`<input type="hidden" name="canonicalUrl" value="${opts.canonicalUrl}">` : ''}
       ${opts.publication ? html`<input type="hidden" name="publication" value="${opts.publication}">` : ''}
+      ${opts.quick ? html`<input type="hidden" name="quick" value="1">` : ''}
       <label for="handle">Your Bluesky handle</label>
       <input type="text" id="handle" name="handle" placeholder="you.bsky.social"
              autocomplete="username" required autofocus>
@@ -181,6 +185,10 @@ export function shareConfirmPage(opts: {
   defaultText: string;
   origin: string;
   token?: string;
+  // Submit straight away with the default text (ADR 0097: the site turned
+  // off "Ask before sharing"). The form stays, for a browser without
+  // scripts.
+  quick?: boolean;
 }) {
   return html`<!DOCTYPE html>
 <html lang="en">
@@ -215,7 +223,7 @@ export function shareConfirmPage(opts: {
 </head>
 <body>
   <div class="card">
-    <h1>Share to Bluesky</h1>
+    <h1>${opts.quick ? 'Sharing to Bluesky…' : 'Share to Bluesky'}</h1>
     <p class="handle">Posting as @${opts.handle}</p>
     <form method="POST" action="/share">
       <input type="hidden" name="document" value="${opts.documentUri}">
@@ -232,6 +240,7 @@ export function shareConfirmPage(opts: {
     </form>
     <p class="privacy"><a href="https://skyscribe.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
+  ${opts.quick ? html`<script>document.forms[0].submit();</script>` : ''}
 </body>
 </html>`;
 }

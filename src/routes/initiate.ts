@@ -19,6 +19,7 @@ export async function handleInitiate(c: Context) {
   const token = (body.token as string) || undefined;
   const canonicalUrl = (body.canonicalUrl as string) || undefined;
   const publication = (body.publication as string) || undefined;
+  const quick = action === 'share' && body.quick === '1';
 
   // For Follow and unfollow, uri is the Publication; for Like and Share it's
   // the Document, with the Publication alongside when the button knows it.
@@ -67,6 +68,7 @@ export async function handleInitiate(c: Context) {
     token,
     canonicalUrl,
     publication,
+    quick,
   };
 
   if (!handle) {
@@ -97,7 +99,16 @@ export async function handleInitiate(c: Context) {
     );
   }
 
-  const pending: PendingData = { action: action as PendingData['action'], uri, origin, title, token, canonicalUrl, publication };
+  const pending: PendingData = {
+    action: action as PendingData['action'],
+    uri,
+    origin,
+    title,
+    token,
+    canonicalUrl,
+    publication,
+    ...(quick ? { quick: true } : {}),
+  };
   setCookie(c, PENDING_COOKIE, encodePending(pending), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
