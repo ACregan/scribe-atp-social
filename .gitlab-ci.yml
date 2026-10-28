@@ -47,21 +47,23 @@ test:
         - "**/*.json"
         - ".gitlab-ci.yml"
 
+# Fly (ADR 0097 in skyscribe-app). Manual, on main only. Needs the
+# FLY_API_TOKEN CI variable (a deploy token for the skyscribe-social app).
 deploy:
   stage: deploy
-  image: node:22
+  needs: []
+  cache: []
+  image: alpine:3.24
+  interruptible: false
   environment:
     name: production
-    url: https://social.scribe-atp.app
-  before_script:
-    - command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )
-    - eval $(ssh-agent -s)
-    - printf '\n' >> "$SSH_DEPLOY_KEY"
-    - chmod 400 "$SSH_DEPLOY_KEY" && ssh-add "$SSH_DEPLOY_KEY"
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+    url: https://social.skyscribe.app
   script:
-    - ssh $VPS_USER@$VPS_HOST "~/server/deploy.sh scribe-atp-social"
+    - apk add --no-cache curl
+    - curl --retry 3 --retry-delay 5 --retry-all-errors -L -o /tmp/fly-install.sh https://fly.io/install.sh
+    - sh /tmp/fly-install.sh
+    - export PATH="$HOME/.fly/bin:$PATH"
+    - flyctl deploy --remote-only
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
