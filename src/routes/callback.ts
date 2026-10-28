@@ -21,7 +21,7 @@ export async function handleCallback(c: Context) {
     return c.html(errorPage('Authentication failed. Please close this window and try again.'), 400);
   }
 
-  const sessionId = sessionStore.create(did);
+  const sessionId = await sessionStore.create(did);
 
   setCookie(c, SESSION_COOKIE, signSessionId(sessionId), {
     httpOnly: true,

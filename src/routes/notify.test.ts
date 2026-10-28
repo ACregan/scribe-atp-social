@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../app.js';
-import { db, actionEvents } from '../db.js';
+import { query, actionEvents } from '../db.js';
 
 const SECRET = process.env.NOTIFY_SECRET!;
 const PUBLICATION_URI = 'at://did:plc:author/site.standard.publication/abc';
@@ -13,8 +13,8 @@ function post(body: unknown, headers: Record<string, string> = {}) {
   });
 }
 
-beforeEach(() => {
-  db.exec('DELETE FROM action_events');
+beforeEach(async () => {
+  await query('DELETE FROM action_events');
   delete process.env.AUTHOR_HANDLE;
   delete process.env.AUTHOR_APP_PASSWORD;
 });
@@ -82,7 +82,7 @@ describe('POST /notify — behaviour', () => {
   });
 
   it('fails with 500 when subscribers exist but author credentials are not configured', async () => {
-    actionEvents.log({
+    await actionEvents.log({
       actionType: 'subscribe',
       publicationUri: PUBLICATION_URI,
       origin: 'https://norobots.blog',
@@ -97,20 +97,16 @@ describe('POST /notify — behaviour', () => {
 
   it('does not count a did whose latest action is unsubscribe as an active subscriber', async () => {
     // created_at is second-resolution (unixepoch()) — inserting both rows
-    // via actionEvents.log() back-to-back can tie, which makes the route's
+    // via await actionEvents.log() back-to-back can tie, which makes the route's
     // "latest action wins" bare-column MAX() query order-ambiguous rather
     // than deterministic (a real fragility, flagged separately). Insert
     // with explicit, clearly-ordered timestamps so this test exercises the
     // intended "unsubscribe happened after subscribe" case unambiguously.
     const now = Math.floor(Date.now() / 1000);
-    db.prepare(
-      `INSERT INTO action_events (action_type, subject_uri, publication_uri, origin, did, created_at)
-       VALUES ('subscribe', ?, ?, ?, ?, ?)`,
-    ).run(PUBLICATION_URI, PUBLICATION_URI, 'https://norobots.blog', 'did:plc:subscriber1', now - 10);
-    db.prepare(
-      `INSERT INTO action_events (action_type, subject_uri, publication_uri, origin, did, created_at)
-       VALUES ('unsubscribe', ?, ?, ?, ?, ?)`,
-    ).run(PUBLICATION_URI, PUBLICATION_URI, 'https://norobots.blog', 'did:plc:subscriber1', now);
+    await query(`INSERT INTO action_events (action_type, subject_uri, publication_uri, origin, did, created_at)
+       VALUES ('subscribe', $1, $2, $3, $4, $5)`, [PUBLICATION_URI, PUBLICATION_URI, 'https://norobots.blog', 'did:plc:subscriber1', now - 10]);
+    await query(`INSERT INTO action_events (action_type, subject_uri, publication_uri, origin, did, created_at)
+       VALUES ('unsubscribe', $1, $2, $3, $4, $5)`, [PUBLICATION_URI, PUBLICATION_URI, 'https://norobots.blog', 'did:plc:subscriber1', now]);
 
     const res = await post(validBody, auth);
 

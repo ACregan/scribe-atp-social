@@ -19,7 +19,7 @@ export async function handleInitiate(c: Context) {
   const canonicalUrl = (body.canonicalUrl as string) || undefined;
   const publication = (body.publication as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.html(errorPage('Invalid origin.'), 400);
   }
 
@@ -62,14 +62,14 @@ export async function handleInitiate(c: Context) {
 
   const ip = getClientIp(c);
 
-  if (initiateAttempts.isLimited(ip)) {
+  if (await initiateAttempts.isLimited(ip)) {
     return c.html(
       handleForm({ ...formOpts, error: 'Too many attempts. Please try again in a few minutes.' }),
       429
     );
   }
 
-  initiateAttempts.record(ip);
+  await initiateAttempts.record(ip);
 
   let authUrl: URL;
   try {

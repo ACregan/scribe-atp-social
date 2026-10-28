@@ -9,29 +9,29 @@ import {
 } from './session.js';
 
 describe('signSessionId / verifySessionId', () => {
-  it('round-trips a valid signed id', () => {
+  it('round-trips a valid signed id', async () => {
     const signed = signSessionId('user-123');
     expect(verifySessionId(signed)).toBe('user-123');
   });
 
-  it('rejects a tampered id (signature no longer matches)', () => {
+  it('rejects a tampered id (signature no longer matches)', async () => {
     const signed = signSessionId('user-123');
     const tampered = signed.replace('user-123', 'user-456');
     expect(verifySessionId(tampered)).toBeNull();
   });
 
-  it('rejects a tampered signature', () => {
+  it('rejects a tampered signature', async () => {
     const signed = signSessionId('user-123');
     const dot = signed.lastIndexOf('.');
     const tampered = signed.slice(0, dot + 1) + 'not-the-real-signature';
     expect(verifySessionId(tampered)).toBeNull();
   });
 
-  it('rejects a value with no signature separator', () => {
+  it('rejects a value with no signature separator', async () => {
     expect(verifySessionId('no-dot-here')).toBeNull();
   });
 
-  it('rejects a signature produced with a different secret', () => {
+  it('rejects a signature produced with a different secret', async () => {
     // Simulates a token forged without knowledge of SESSION_SECRET.
     const forged = 'user-123.' + Buffer.from('garbage').toString('base64url');
     expect(verifySessionId(forged)).toBeNull();
@@ -46,12 +46,12 @@ describe('encodePending / decodePending', () => {
     title: 'NoRobots',
   };
 
-  it('round-trips valid pending data', () => {
+  it('round-trips valid pending data', async () => {
     const encoded = encodePending(data);
     expect(decodePending(encoded)).toEqual(data);
   });
 
-  it('rejects tampered payload (signature no longer matches)', () => {
+  it('rejects tampered payload (signature no longer matches)', async () => {
     const encoded = encodePending(data);
     const dot = encoded.lastIndexOf('.');
     const payload = encoded.slice(0, dot);
@@ -61,11 +61,11 @@ describe('encodePending / decodePending', () => {
     expect(decodePending(`${tamperedPayload}.${sig}`)).toBeNull();
   });
 
-  it('rejects a value with no signature separator', () => {
+  it('rejects a value with no signature separator', async () => {
     expect(decodePending('no-dot-here')).toBeNull();
   });
 
-  it('never throws on garbled input, even when the signature segment itself is malformed', () => {
+  it('never throws on garbled input, even when the signature segment itself is malformed', async () => {
     const encoded = encodePending(data);
     const dot = encoded.lastIndexOf('.');
     const garbled = `${encoded.slice(0, dot)}x.${encoded.slice(dot + 1)}`;
@@ -75,27 +75,27 @@ describe('encodePending / decodePending', () => {
 });
 
 describe('verifyBearerSecret', () => {
-  it('accepts a matching Bearer header', () => {
+  it('accepts a matching Bearer header', async () => {
     expect(verifyBearerSecret('Bearer correct-secret', 'correct-secret')).toBe(true);
   });
 
-  it('rejects a mismatched secret', () => {
+  it('rejects a mismatched secret', async () => {
     expect(verifyBearerSecret('Bearer wrong-secret', 'correct-secret')).toBe(false);
   });
 
-  it('rejects when no secret is configured', () => {
+  it('rejects when no secret is configured', async () => {
     expect(verifyBearerSecret('Bearer anything', undefined)).toBe(false);
   });
 
-  it('rejects a missing Authorization header', () => {
+  it('rejects a missing Authorization header', async () => {
     expect(verifyBearerSecret('', 'correct-secret')).toBe(false);
   });
 
-  it('rejects a header missing the Bearer prefix', () => {
+  it('rejects a header missing the Bearer prefix', async () => {
     expect(verifyBearerSecret('correct-secret', 'correct-secret')).toBe(false);
   });
 
-  it('rejects secrets of different lengths without throwing', () => {
+  it('rejects secrets of different lengths without throwing', async () => {
     // timingSafeEqual throws on length mismatch — verifyBearerSecret must
     // catch that internally (via safeEqual) rather than propagate it.
     expect(() => verifyBearerSecret('Bearer short', 'a-much-longer-secret-value')).not.toThrow();

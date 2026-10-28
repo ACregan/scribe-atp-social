@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../app.js';
-import { db, allowedOrigins } from '../db.js';
+import { query, allowedOrigins } from '../db.js';
 
 const SECRET = process.env.NOTIFY_SECRET!;
 
@@ -12,8 +12,8 @@ function post(body: unknown, headers: Record<string, string> = {}) {
   });
 }
 
-beforeEach(() => {
-  db.exec("DELETE FROM allowed_origins WHERE origin = 'https://newsite.example'");
+beforeEach(async () => {
+  await query("DELETE FROM allowed_origins WHERE origin = 'https://newsite.example'");
 });
 
 const validBody = { origin: 'https://newsite.example', did: 'did:plc:owner1' };
@@ -67,11 +67,11 @@ describe('POST /origins — behaviour', () => {
   const auth = { Authorization: `Bearer ${SECRET}` };
 
   it('adds a new origin, immediately allowed afterwards', async () => {
-    expect(allowedOrigins.isAllowed('https://newsite.example')).toBe(false);
+    expect(await allowedOrigins.isAllowed('https://newsite.example')).toBe(false);
     const res = await post(validBody, auth);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
-    expect(allowedOrigins.isAllowed('https://newsite.example')).toBe(true);
+    expect(await allowedOrigins.isAllowed('https://newsite.example')).toBe(true);
   });
 
   it('is idempotent — registering the same origin twice does not error', async () => {
@@ -83,17 +83,13 @@ describe('POST /origins — behaviour', () => {
   it('updates owner_did when the same origin is re-registered under a different did', async () => {
     await post(validBody, auth);
     await post({ origin: 'https://newsite.example', did: 'did:plc:newowner' }, auth);
-    const row = db
-      .prepare<string, { owner_did: string }>(
-        'SELECT owner_did FROM allowed_origins WHERE origin = ?',
-      )
-      .get('https://newsite.example');
+    const row = (await query<{ owner_did: string }>('SELECT owner_did FROM allowed_origins WHERE origin = $1', ['https://newsite.example']))[0];
     expect(row?.owner_did).toBe('did:plc:newowner');
   });
 });
 
 describe('allowedOrigins — legacy seed data', () => {
-  it('pre-seeds the origins that used to be hardcoded in ALLOWED_ORIGINS', () => {
+  it('pre-seeds the origins that used to be hardcoded in ALLOWED_ORIGINS', async () => {
     for (const origin of [
       'https://norobots.blog',
       'https://anthonycregan.co.uk',
@@ -102,11 +98,11 @@ describe('allowedOrigins — legacy seed data', () => {
       'https://www.perpetualsummer.ltd',
       'https://scribe-cms.app',
     ]) {
-      expect(allowedOrigins.isAllowed(origin)).toBe(true);
+      expect(await allowedOrigins.isAllowed(origin)).toBe(true);
     }
   });
 
-  it('does not allow an origin that was never registered', () => {
-    expect(allowedOrigins.isAllowed('https://never-registered.example')).toBe(false);
+  it('does not allow an origin that was never registered', async () => {
+    expect(await allowedOrigins.isAllowed('https://never-registered.example')).toBe(false);
   });
 });

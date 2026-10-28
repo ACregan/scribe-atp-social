@@ -4,14 +4,14 @@ import { SESSION_COOKIE } from './config.js';
 import { sessionStore } from './db.js';
 import { verifySessionId } from './session.js';
 
-export function getSessionDid(c: Context): string | null {
+export async function getSessionDid(c: Context): Promise<string | null> {
   const cookieValue = getCookie(c, SESSION_COOKIE);
   if (!cookieValue) return null;
   const sessionId = verifySessionId(cookieValue);
   if (!sessionId) return null;
-  const did = sessionStore.get(sessionId);
+  const did = await sessionStore.get(sessionId);
   if (!did) return null;
-  sessionStore.touch(sessionId);
+  await sessionStore.touch(sessionId);
   return did;
 }
 

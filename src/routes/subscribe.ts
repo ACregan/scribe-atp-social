@@ -43,14 +43,14 @@ export async function handleSubscribe(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
@@ -86,7 +86,7 @@ export async function handleSubscribe(c: Context) {
   const { agent, handle } = result;
 
   if (await hasExistingSubscription(agent, did, publicationUri)) {
-    if (token) completionTokens.store(token, 'subscribe');
+    if (token) await completionTokens.store(token, 'subscribe');
     return c.html(alreadyActioned({ action: 'subscribe', title, origin }));
   }
 
@@ -99,14 +99,14 @@ export async function handleSubscribePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -119,7 +119,7 @@ export async function handleSubscribePost(c: Context) {
   const { agent } = result;
 
   if (await hasExistingSubscription(agent, did, publicationUri)) {
-    if (token) completionTokens.store(token, 'subscribe');
+    if (token) await completionTokens.store(token, 'subscribe');
     return c.html(alreadyActioned({ action: 'subscribe', title: '', origin }));
   }
 
@@ -138,8 +138,8 @@ export async function handleSubscribePost(c: Context) {
     return c.html(errorPage(`Could not create record: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'subscribe', publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'subscribe');
+  await actionEvents.log({ actionType: 'subscribe', publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'subscribe');
 
   return c.html(successPage({ action: 'subscribe', origin }));
 }

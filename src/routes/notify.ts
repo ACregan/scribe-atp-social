@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { AtpAgent } from '@atproto/api';
-import { db } from '../db.js';
+import { follows } from '../db.js';
 import { verifyBearerSecret } from '../session.js';
 
 interface NotifyBody {
@@ -9,24 +9,6 @@ interface NotifyBody {
   articleTitle?: unknown;
   canonicalUrl?: unknown;
   origin?: unknown;
-}
-
-function getActiveSubscriberDids(publicationUri: string): string[] {
-  const rows = db
-    .prepare<
-      string,
-      { did: string; action_type: string }
-    >(
-      `SELECT did, action_type FROM (
-         SELECT did, action_type, MAX(created_at) AS latest
-         FROM action_events
-         WHERE publication_uri = ?
-           AND action_type IN ('subscribe', 'unsubscribe')
-         GROUP BY did
-       ) WHERE action_type = 'subscribe'`
-    )
-    .all(publicationUri);
-  return rows.map((r) => r.did);
 }
 
 async function getOrCreateConvoId(agent: AtpAgent, memberDid: string): Promise<string> {
@@ -70,7 +52,7 @@ export async function handleNotify(c: Context) {
     return c.json({ ok: false, error: 'articleTitle and canonicalUrl are required' }, 400);
   }
 
-  const subscriberDids = getActiveSubscriberDids(publicationUri);
+  const subscriberDids = await follows.activeDids(publicationUri);
   if (subscriberDids.length === 0) {
     return c.json({ ok: true, sent: 0, skipped: 0 });
   }

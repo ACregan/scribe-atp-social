@@ -34,7 +34,7 @@ app.post('/origins', handleAddOrigin);
 app.get('/events', handleEvents);
 app.use(
   '/counts',
-  cors({ origin: (origin) => (allowedOrigins.isAllowed(origin) ? origin : undefined) })
+  cors({ origin: async (origin) => ((await allowedOrigins.isAllowed(origin)) ? origin : undefined) })
 );
 app.get('/counts', handleCounts);
 app.get('/health', (c) => c.json({ ok: true }));

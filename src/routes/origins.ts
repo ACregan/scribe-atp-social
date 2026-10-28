@@ -32,6 +32,6 @@ export async function handleAddOrigin(c: Context) {
     return c.json({ ok: false, error: 'Invalid origin' }, 400);
   }
 
-  allowedOrigins.add(origin, did);
+  await allowedOrigins.add(origin, did);
   return c.json({ ok: true });
 }

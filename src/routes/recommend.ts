@@ -44,14 +44,14 @@ export async function handleRecommend(c: Context) {
   const token = c.req.query('token') || undefined;
   const publication = c.req.query('publication') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
@@ -89,7 +89,7 @@ export async function handleRecommend(c: Context) {
   const { agent, handle } = result;
 
   if (await hasExistingRecommend(agent, did, documentUri)) {
-    if (token) completionTokens.store(token, 'recommend');
+    if (token) await completionTokens.store(token, 'recommend');
     return c.html(alreadyActioned({ action: 'recommend', title, origin }));
   }
 
@@ -103,14 +103,14 @@ export async function handleRecommendPost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -123,7 +123,7 @@ export async function handleRecommendPost(c: Context) {
   const { agent } = result;
 
   if (await hasExistingRecommend(agent, did, documentUri)) {
-    if (token) completionTokens.store(token, 'recommend');
+    if (token) await completionTokens.store(token, 'recommend');
     return c.html(alreadyActioned({ action: 'recommend', title: '', origin }));
   }
 
@@ -142,8 +142,8 @@ export async function handleRecommendPost(c: Context) {
     return c.html(errorPage(`Could not create record: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'recommend', documentUri, publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'recommend');
+  await actionEvents.log({ actionType: 'recommend', documentUri, publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'recommend');
 
   return c.html(successPage({ action: 'recommend', origin }));
 }

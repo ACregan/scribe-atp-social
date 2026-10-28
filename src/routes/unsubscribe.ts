@@ -46,14 +46,14 @@ export async function handleUnsubscribe(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
@@ -96,14 +96,14 @@ export async function handleUnsubscribePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -131,8 +131,8 @@ export async function handleUnsubscribePost(c: Context) {
     return c.html(errorPage(`Could not delete subscription: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'unsubscribe', publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'unsubscribe');
+  await actionEvents.log({ actionType: 'unsubscribe', publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'unsubscribe');
 
   return c.html(successPage({ action: 'unsubscribe', origin }));
 }

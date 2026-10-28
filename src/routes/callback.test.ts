@@ -12,7 +12,7 @@ function pendingCookie(data: PendingData): string {
   return `scribe_pending=${encodePending(data)}`;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(oauthClient.callback).mockReset();
 });
 

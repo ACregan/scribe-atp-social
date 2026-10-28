@@ -15,12 +15,13 @@
     "@atproto/api": "^0.19.18",
     "@atproto/oauth-client-node": "^0.3.17",
     "@hono/node-server": "^1.14.4",
-    "better-sqlite3": "^12.10.0",
-    "hono": "^4"
+    "hono": "^4",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
+    "@electric-sql/pglite": "^0.5.9",
     "@types/node": "^22",
+    "@types/pg": "^8.23.1",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

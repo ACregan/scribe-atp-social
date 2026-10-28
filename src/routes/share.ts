@@ -54,14 +54,14 @@ export async function handleShare(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
@@ -115,7 +115,7 @@ export async function handleSharePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
+  if (!await allowedOrigins.isAllowed(origin)) {
     return c.text('Invalid origin', 400);
   }
   if (!documentUri.startsWith('at://')) {
@@ -125,7 +125,7 @@ export async function handleSharePost(c: Context) {
     return c.html(errorPage('Post text cannot be empty.'));
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -214,8 +214,8 @@ export async function handleSharePost(c: Context) {
     return c.html(errorPage(`Could not create post: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'share', documentUri, publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'share');
+  await actionEvents.log({ actionType: 'share', documentUri, publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'share');
 
   return c.html(successPage({ action: 'share', origin }));
 }
