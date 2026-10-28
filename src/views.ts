@@ -17,7 +17,7 @@ export function handleForm(opts: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${opts.heading} — Scribe</title>
+  <title>${opts.heading} — SkyScribe</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
@@ -59,7 +59,7 @@ export function handleForm(opts: {
              autocomplete="username" required autofocus>
       <button type="submit">Continue with Bluesky</button>
     </form>
-    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
+    <p class="privacy"><a href="https://skyscribe.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
@@ -76,11 +76,11 @@ export function confirmPage(opts: {
 }) {
   const heading = opts.action === 'recommend'
     ? (opts.title ? `Like "${opts.title}"` : 'Like this article')
-    : (opts.title ? `Subscribe to ${opts.title}` : 'Subscribe');
+    : (opts.title ? `Follow ${opts.title}` : 'Follow');
   const confirmText = opts.action === 'recommend'
     ? `Like as @${opts.handle}?`
-    : `Subscribe as @${opts.handle}?`;
-  const buttonText = opts.action === 'recommend' ? 'Like' : 'Subscribe';
+    : `Follow as @${opts.handle}?`;
+  const buttonText = opts.action === 'recommend' ? 'Like' : 'Follow';
   const hiddenName = opts.action === 'recommend' ? 'document' : 'publication';
 
   return html`<!DOCTYPE html>
@@ -88,7 +88,7 @@ export function confirmPage(opts: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${heading} — Scribe</title>
+  <title>${heading} — SkyScribe</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
@@ -123,7 +123,7 @@ export function confirmPage(opts: {
         <button type="submit">${buttonText}</button>
       </div>
     </form>
-    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
+    <p class="privacy"><a href="https://skyscribe.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
@@ -134,17 +134,17 @@ export function alreadyActioned(opts: {
   title: string;
   origin: string;
 }) {
-  const heading = opts.action === 'recommend' ? 'Already liked ✓' : 'Already subscribed ✓';
+  const heading = opts.action === 'recommend' ? 'Already liked ✓' : 'Already following ✓';
   const message = opts.action === 'recommend'
     ? (opts.title ? `You already liked "${opts.title}".` : 'You already liked this article.')
-    : (opts.title ? `You are already subscribed to ${opts.title}.` : 'You are already subscribed.');
+    : (opts.title ? `You already follow ${opts.title}.` : 'You already follow this.');
 
   return html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${opts.action === 'recommend' ? 'Liked' : 'Subscribed'} — Scribe</title>
+  <title>${opts.action === 'recommend' ? 'Liked' : 'Following'} — SkyScribe</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
@@ -153,6 +153,7 @@ export function alreadyActioned(opts: {
             box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center; }
     h1 { font-size: 1.5rem; margin-bottom: 0.75rem; color: #111; }
     p { color: #555; font-size: 0.875rem; }
+    .close-hint { margin-top: 0.75rem; }
   </style>
 </head>
 <body>
@@ -160,12 +161,14 @@ export function alreadyActioned(opts: {
     <h1>${heading}</h1>
     <p>${message}</p>
   </div>
-  <script>
+  ${opts.origin
+    ? html`<script>
     try {
       window.opener.postMessage({ ok: true, action: ${JSON.stringify(opts.action)} }, ${JSON.stringify(opts.origin)});
     } catch (_) {}
     setTimeout(() => window.close(), 1200);
-  </script>
+  </script>`
+    : html`<p class="close-hint">You can close this tab.</p>`}
 </body>
 </html>`;
 }
@@ -184,7 +187,7 @@ export function shareConfirmPage(opts: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Share — Scribe</title>
+  <title>Share — SkyScribe</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
@@ -227,7 +230,7 @@ export function shareConfirmPage(opts: {
         <button type="submit">Share</button>
       </div>
     </form>
-    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
+    <p class="privacy"><a href="https://skyscribe.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
@@ -238,12 +241,12 @@ export function successPage(opts: {
   origin: string;
 }) {
   const heading = opts.action === 'recommend' ? 'Liked ✓'
-    : opts.action === 'subscribe' ? 'Subscribed ✓'
-    : opts.action === 'unsubscribe' ? 'Unsubscribed'
+    : opts.action === 'subscribe' ? 'Following ✓'
+    : opts.action === 'unsubscribe' ? 'Unfollowed'
     : 'Shared ✓';
   const message = opts.action === 'recommend' ? 'Thanks for the like!'
-    : opts.action === 'subscribe' ? 'Thanks for subscribing!'
-    : opts.action === 'unsubscribe' ? 'You have been unsubscribed.'
+    : opts.action === 'subscribe' ? "Thanks for following! You'll get a Bluesky message when there's a new post."
+    : opts.action === 'unsubscribe' ? "You've unfollowed. You won't get messages about new posts."
     : 'Thanks for sharing!';
 
   return html`<!DOCTYPE html>
@@ -251,7 +254,7 @@ export function successPage(opts: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${heading} — Scribe</title>
+  <title>${heading} — SkyScribe</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
@@ -260,6 +263,7 @@ export function successPage(opts: {
             box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center; }
     h1 { font-size: 1.5rem; margin-bottom: 0.75rem; color: #111; }
     p { color: #555; font-size: 0.875rem; }
+    .close-hint { margin-top: 0.75rem; }
   </style>
 </head>
 <body>
@@ -267,12 +271,14 @@ export function successPage(opts: {
     <h1>${heading}</h1>
     <p>${message}</p>
   </div>
-  <script>
+  ${opts.origin
+    ? html`<script>
     try {
       window.opener.postMessage({ ok: true, action: ${JSON.stringify(opts.action)} }, ${JSON.stringify(opts.origin)});
     } catch (_) {}
     setTimeout(() => window.close(), 1200);
-  </script>
+  </script>`
+    : html`<p class="close-hint">You can close this tab.</p>`}
 </body>
 </html>`;
 }
@@ -284,14 +290,14 @@ export function unsubscribeConfirmPage(opts: {
   title: string;
   token?: string;
 }) {
-  const heading = opts.title ? `Unsubscribe from ${opts.title}?` : 'Unsubscribe?';
+  const heading = opts.title ? `Unfollow ${opts.title}?` : 'Unfollow?';
 
   return html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${heading} — Scribe</title>
+  <title>${heading} — SkyScribe</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;
@@ -316,16 +322,16 @@ export function unsubscribeConfirmPage(opts: {
   <div class="card">
     <h1>${heading}</h1>
     <p class="handle">as @${opts.handle}</p>
-    <form method="POST" action="/unsubscribe">
+    <form method="POST" action="/unfollow">
       <input type="hidden" name="publication" value="${opts.publicationUri}">
       <input type="hidden" name="origin" value="${opts.origin}">
       ${opts.token ? html`<input type="hidden" name="token" value="${opts.token}">` : ''}
       <div class="actions">
         <button type="button" onclick="window.close()">Cancel</button>
-        <button type="submit">Unsubscribe</button>
+        <button type="submit">Unfollow</button>
       </div>
     </form>
-    <p class="privacy"><a href="https://docs.scribe-atp.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
+    <p class="privacy"><a href="https://skyscribe.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
   </div>
 </body>
 </html>`;
@@ -337,7 +343,7 @@ export function errorPage(message: string) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Error — Scribe</title>
+  <title>Error — SkyScribe</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5;

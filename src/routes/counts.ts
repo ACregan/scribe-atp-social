@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { db } from '../db.js';
+import { query } from '../db.js';
 import { parseDate, validateDateRange } from '../utils/parseDate.js';
 
 const VALID_ACTION_TYPES = new Set(['recommend', 'subscribe', 'share']);
@@ -20,7 +20,7 @@ function isRateLimited(ip: string): boolean {
   return hits.length > RATE_LIMIT_MAX;
 }
 
-export function handleCounts(c: Context) {
+export async function handleCounts(c: Context) {
   const ip = c.req.header('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
   if (isRateLimited(ip)) {
     return c.json({ ok: false, error: 'Too many requests' }, 429);
@@ -65,39 +65,47 @@ export function handleCounts(c: Context) {
     if (rangeError) return c.json({ ok: false, error: rangeError }, 400);
   }
 
-  const conditions: string[] = ['action_type = ?'];
   const params: (string | number)[] = [actionType];
+  const conditions: string[] = ['action_type = $1'];
+  // Each condition takes the next $n placeholder.
+  const add = (sql: string, value: string | number) => {
+    params.push(value);
+    conditions.push(sql.replace('?', `$${params.length}`));
+  };
 
-  if (publicationUri) { conditions.push('publication_uri = ?'); params.push(publicationUri); }
-  if (documentUri)    { conditions.push('document_uri = ?');    params.push(documentUri); }
-  if (origin)         { conditions.push('origin = ?');          params.push(origin); }
-  if (from !== null)  { conditions.push('created_at >= ?');     params.push(from); }
-  conditions.push('created_at <= ?'); params.push(to);
+  if (publicationUri) add('publication_uri = ?', publicationUri);
+  if (documentUri)    add('document_uri = ?', documentUri);
+  if (origin)         add('origin = ?', origin);
+  if (from !== null)  add('created_at >= ?', from);
+  add('created_at <= ?', to);
 
   const where = conditions.join(' AND ');
 
   if (!groupBy) {
-    const row = db.prepare<(string | number)[], { count: number }>(
-      `SELECT COUNT(*) as count FROM action_events WHERE ${where}`
-    ).get(...params) as { count: number };
+    const [row] = await query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM action_events WHERE ${where}`,
+      params,
+    );
     return c.json({ count: row.count });
   }
 
   const groupCol = groupBy === 'day'
-    ? "strftime('%Y-%m-%d', created_at, 'unixepoch')"
+    ? "to_char(to_timestamp(created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD')"
     : groupBy;
 
   const orderClause = orderBy === 'date' ? 'key ASC' : 'count DESC';
 
-  const total = (db.prepare<(string | number)[], { count: number }>(
-    `SELECT COUNT(*) as count FROM action_events WHERE ${where}`
-  ).get(...params) as { count: number }).count;
+  const [{ count: total }] = await query<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM action_events WHERE ${where}`,
+    params,
+  );
 
-  const groups = db.prepare<(string | number)[], { key: string; count: number }>(
-    `SELECT ${groupCol} as key, COUNT(*) as count
+  const groups = await query<{ key: string; count: number }>(
+    `SELECT ${groupCol} AS key, COUNT(*) AS count
      FROM action_events WHERE ${where}
-     GROUP BY ${groupCol} ORDER BY ${orderClause} LIMIT ?`
-  ).all(...params, limit);
+     GROUP BY ${groupCol} ORDER BY ${orderClause} LIMIT $${params.length + 1}`,
+    [...params, limit],
+  );
 
   return c.json({ groups, total });
 }

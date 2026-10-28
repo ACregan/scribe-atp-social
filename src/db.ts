@@ -1,253 +1,209 @@
-import Database from 'better-sqlite3';
-import path from 'node:path';
-import fs from 'node:fs';
+import pg from 'pg';
 import { RATE_LIMIT_WINDOW, RATE_LIMIT_MAX } from './config.js';
 
-// Overridable so tests can point at an isolated `:memory:` database instead
-// of the real one on disk (see test/setup.ts).
-const DB_PATH = process.env.SOCIAL_DB_PATH ?? path.resolve(process.cwd(), 'data/social.db');
+// Postgres (Neon in production, ADR 0097 in skyscribe-app). Timestamps stay
+// epoch seconds in BIGINT columns, as they were in SQLite, and int8 values
+// are parsed to numbers so callers do arithmetic on them as before.
 
-let _db: Database.Database | undefined;
-
-function getDb(): Database.Database {
-  if (!_db) {
-    if (DB_PATH !== ':memory:') fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    _db = new Database(DB_PATH);
-    _db.pragma('journal_mode = WAL');
-  }
-  migrate(_db);
-  return _db;
+export interface DbClient {
+  query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-function migrate(db: Database.Database) {
-  db.exec(`
+// int8: COUNT(*) and the BIGINT epoch columns. Safe as a number: counts and
+// epoch seconds are far below 2^53.
+pg.types.setTypeParser(20, (v) => Number(v));
+
+let client: DbClient | undefined;
+
+// Tests swap in an in-process PGlite (test/setup.ts).
+export function setDbClient(c: DbClient) {
+  client = c;
+}
+
+function getClient(): DbClient {
+  if (!client) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is required');
+    }
+    client = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  }
+  return client;
+}
+
+export async function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+  return (await getClient().query<T>(sql, params)).rows;
+}
+
+// floor(), not a plain ::bigint cast, which rounds: x.6 seconds would be
+// stamped a second in the future and miss `created_at <= now` filters.
+// SQLite's unixepoch() truncated.
+const NOW = '(floor(extract(epoch from now()))::bigint)';
+
+const SCHEMA = `
     CREATE TABLE IF NOT EXISTS oauth_state (
-      key        TEXT    PRIMARY KEY,
-      value      TEXT    NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      key        TEXT   PRIMARY KEY,
+      value      TEXT   NOT NULL,
+      created_at BIGINT NOT NULL DEFAULT ${NOW}
     );
 
     CREATE TABLE IF NOT EXISTS oauth_session (
-      key        TEXT    PRIMARY KEY,
-      value      TEXT    NOT NULL,
-      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      key        TEXT   PRIMARY KEY,
+      value      TEXT   NOT NULL,
+      updated_at BIGINT NOT NULL DEFAULT ${NOW}
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
-      id           TEXT    PRIMARY KEY,
-      did          TEXT    NOT NULL,
-      created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
-      last_used_at INTEGER NOT NULL DEFAULT (unixepoch())
+      id           TEXT   PRIMARY KEY,
+      did          TEXT   NOT NULL,
+      created_at   BIGINT NOT NULL DEFAULT ${NOW},
+      last_used_at BIGINT NOT NULL DEFAULT ${NOW}
     );
-
     CREATE INDEX IF NOT EXISTS sessions_did ON sessions (did);
 
     CREATE TABLE IF NOT EXISTS initiate_attempts (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      ip         TEXT    NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      id         BIGSERIAL PRIMARY KEY,
+      ip         TEXT      NOT NULL,
+      created_at BIGINT    NOT NULL DEFAULT ${NOW}
     );
-
     CREATE INDEX IF NOT EXISTS initiate_attempts_ip_created
       ON initiate_attempts (ip, created_at);
 
     CREATE TABLE IF NOT EXISTS completion_tokens (
-      token      TEXT    PRIMARY KEY,
-      action     TEXT    NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      token      TEXT   PRIMARY KEY,
+      action     TEXT   NOT NULL,
+      created_at BIGINT NOT NULL DEFAULT ${NOW}
     );
 
     CREATE TABLE IF NOT EXISTS action_events (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      action_type      TEXT    NOT NULL,
-      subject_uri      TEXT    NOT NULL,
-      document_uri     TEXT,
-      publication_uri  TEXT,
-      origin           TEXT,
-      did              TEXT    NOT NULL,
-      created_at       INTEGER NOT NULL DEFAULT (unixepoch())
+      id              BIGSERIAL PRIMARY KEY,
+      action_type     TEXT      NOT NULL,
+      subject_uri     TEXT      NOT NULL,
+      document_uri    TEXT,
+      publication_uri TEXT,
+      origin          TEXT,
+      did             TEXT      NOT NULL,
+      created_at      BIGINT    NOT NULL DEFAULT ${NOW}
     );
-
     CREATE INDEX IF NOT EXISTS action_events_subject
       ON action_events (action_type, subject_uri);
+    CREATE INDEX IF NOT EXISTS action_events_publication ON action_events (publication_uri);
+    CREATE INDEX IF NOT EXISTS action_events_document ON action_events (document_uri);
+    CREATE INDEX IF NOT EXISTS action_events_pub_type_time
+      ON action_events (publication_uri, action_type, created_at);
+    CREATE INDEX IF NOT EXISTS action_events_type_time
+      ON action_events (action_type, created_at);
 
-    CREATE TABLE IF NOT EXISTS allowed_origins (
-      origin     TEXT    PRIMARY KEY,
-      owner_did  TEXT,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    -- When a Follower's Follow record was last found in their account
+    -- (followers.ts). Only 'still following' is cached.
+    CREATE TABLE IF NOT EXISTS follow_checks (
+      publication_uri TEXT   NOT NULL,
+      did             TEXT   NOT NULL,
+      checked_at      BIGINT NOT NULL,
+      PRIMARY KEY (publication_uri, did)
     );
-  `);
+`;
 
-  // Seed the origins that used to be hardcoded in config.ts's ALLOWED_ORIGINS
-  // array, so existing consumer sites don't lose access the moment this
-  // migration first runs. owner_did is unknown for these — the CMS backfills
-  // it going forward via POST /origins whenever a Site's domain is (re)set.
-  const seedOrigin = db.prepare('INSERT OR IGNORE INTO allowed_origins (origin) VALUES (?)');
-  for (const origin of [
-    'https://norobots.blog',
-    'https://anthonycregan.co.uk',
-    'https://www.anthonycregan.co.uk',
-    'https://perpetualsummer.ltd',
-    'https://www.perpetualsummer.ltd',
-    'https://scribe-cms.app',
-  ]) {
-    seedOrigin.run(origin);
+// One statement at a time: PGlite (the tests) refuses several in one query.
+export async function migrate() {
+  for (const statement of SCHEMA.split(';')) {
+    if (statement.trim()) await query(statement);
   }
-
-  // Add columns to existing databases that pre-date this schema — must run
-  // before the indexes on those columns are created below.
-  for (const col of ['document_uri TEXT', 'publication_uri TEXT', 'origin TEXT']) {
-    try { db.exec(`ALTER TABLE action_events ADD COLUMN ${col}`); } catch { /* already exists */ }
-  }
-
-  // Indexes on the columns added above — kept separate so they run after ALTER TABLE.
-  for (const stmt of [
-    'CREATE INDEX IF NOT EXISTS action_events_publication ON action_events (publication_uri)',
-    'CREATE INDEX IF NOT EXISTS action_events_document ON action_events (document_uri)',
-    'CREATE INDEX IF NOT EXISTS action_events_pub_type_time ON action_events (publication_uri, action_type, created_at)',
-    'CREATE INDEX IF NOT EXISTS action_events_type_time ON action_events (action_type, created_at)',
-  ]) {
-    try { db.exec(stmt); } catch { /* already exists */ }
-  }
-
-  // Backfill existing rows from subject_uri
-  db.exec(`
-    UPDATE action_events SET document_uri = subject_uri
-      WHERE action_type IN ('recommend', 'share') AND document_uri IS NULL;
-    UPDATE action_events SET publication_uri = subject_uri
-      WHERE action_type = 'subscribe' AND publication_uri IS NULL;
-  `);
 }
-
-function pruneStaleState(db: Database.Database) {
-  db.prepare('DELETE FROM oauth_state WHERE created_at < unixepoch() - 600').run();
-}
-
-function pruneStaleInitiateAttempts(db: Database.Database) {
-  db.prepare(
-    'DELETE FROM initiate_attempts WHERE created_at < unixepoch() - ?'
-  ).run(RATE_LIMIT_WINDOW);
-}
-
-export const db = getDb();
 
 // GDPR retention policy — 90-day limit on inactive personal data.
 const NINETY_DAYS = 90 * 24 * 60 * 60;
 
-pruneStaleState(db);
-pruneStaleInitiateAttempts(db);
-pruneStaleCompletionTokens(db);
-pruneStaleUnsubscribeEvents(db);
-pruneStaleEngagementEvents(db);
-pruneStaleOAuthSessions(db);
-pruneStaleUserSessions(db);
+// Run at startup and hourly (index.ts): a Fly machine can run for weeks
+// between deploys, unlike the old PM2 process restarted by every deploy.
+export async function prune() {
+  await query(`DELETE FROM oauth_state WHERE created_at < ${NOW} - 600`);
+  await query(`DELETE FROM initiate_attempts WHERE created_at < ${NOW} - $1`, [
+    RATE_LIMIT_WINDOW,
+  ]);
+  await query(`DELETE FROM completion_tokens WHERE created_at < ${NOW} - 3600`);
+  // Unsubscribe events are logged for auditing then become stale — the PDS
+  // record is already deleted, so there is no active subscription to track.
+  await query(
+    `DELETE FROM action_events WHERE action_type = 'unsubscribe' AND created_at < ${NOW} - $1`,
+    [NINETY_DAYS],
+  );
+  // Recommend and share events — one-off actions containing reader DIDs.
+  // Retained for 90 days for analytics (within the /counts query cap), then
+  // pruned. Subscribe events are deliberately excluded: active subscriptions
+  // must be kept: they are the Follower list (followers.ts).
+  await query(
+    `DELETE FROM action_events WHERE action_type IN ('recommend', 'share') AND created_at < ${NOW} - $1`,
+    [NINETY_DAYS],
+  );
+  // OAuth sessions inactive for 90+ days — updated_at reflects last token refresh.
+  await query(`DELETE FROM oauth_session WHERE updated_at < ${NOW} - $1`, [NINETY_DAYS]);
+  // Follow checks hold reader DIDs: a stale one is just checked again.
+  await query(`DELETE FROM follow_checks WHERE checked_at < ${NOW} - $1`, [NINETY_DAYS]);
+  // User sessions (scribe_session cookie) inactive for 90+ days.
+  await query(`DELETE FROM sessions WHERE last_used_at < ${NOW} - $1`, [NINETY_DAYS]);
+}
 
-export const oauthStateStore = {
-  get: (key: string) => {
-    const row = db
-      .prepare<string, { value: string }>('SELECT value FROM oauth_state WHERE key = ?')
-      .get(key);
-    return Promise.resolve(row ? JSON.parse(row.value) : undefined);
-  },
-  set: (key: string, val: unknown) => {
-    db.prepare(
-      'INSERT OR REPLACE INTO oauth_state (key, value, created_at) VALUES (?, ?, unixepoch())'
-    ).run(key, JSON.stringify(val));
-    return Promise.resolve();
-  },
-  del: (key: string) => {
-    db.prepare('DELETE FROM oauth_state WHERE key = ?').run(key);
-    return Promise.resolve();
-  },
-};
+function kvStore(table: 'oauth_state' | 'oauth_session', timeCol: 'created_at' | 'updated_at') {
+  return {
+    get: async (key: string) => {
+      const [row] = await query<{ value: string }>(
+        `SELECT value FROM ${table} WHERE key = $1`,
+        [key],
+      );
+      return row ? JSON.parse(row.value) : undefined;
+    },
+    set: async (key: string, val: unknown) => {
+      await query(
+        `INSERT INTO ${table} (key, value, ${timeCol}) VALUES ($1, $2, ${NOW})
+           ON CONFLICT (key) DO UPDATE SET value = excluded.value, ${timeCol} = excluded.${timeCol}`,
+        [key, JSON.stringify(val)],
+      );
+    },
+    del: async (key: string) => {
+      await query(`DELETE FROM ${table} WHERE key = $1`, [key]);
+    },
+  };
+}
 
-export const oauthSessionStore = {
-  get: (key: string) => {
-    const row = db
-      .prepare<string, { value: string }>('SELECT value FROM oauth_session WHERE key = ?')
-      .get(key);
-    return Promise.resolve(row ? JSON.parse(row.value) : undefined);
-  },
-  set: (key: string, val: unknown) => {
-    db.prepare(
-      'INSERT OR REPLACE INTO oauth_session (key, value, updated_at) VALUES (?, ?, unixepoch())'
-    ).run(key, JSON.stringify(val));
-    return Promise.resolve();
-  },
-  del: (key: string) => {
-    db.prepare('DELETE FROM oauth_session WHERE key = ?').run(key);
-    return Promise.resolve();
-  },
-};
+export const oauthStateStore = kvStore('oauth_state', 'created_at');
+export const oauthSessionStore = kvStore('oauth_session', 'updated_at');
 
 export const sessionStore = {
-  create: (did: string): string => {
+  create: async (did: string): Promise<string> => {
     const id = crypto.randomUUID();
-    db.prepare('INSERT INTO sessions (id, did) VALUES (?, ?)').run(id, did);
+    await query('INSERT INTO sessions (id, did) VALUES ($1, $2)', [id, did]);
     return id;
   },
-  get: (id: string): string | undefined => {
-    const row = db
-      .prepare<string, { did: string }>('SELECT did FROM sessions WHERE id = ?')
-      .get(id);
+  get: async (id: string): Promise<string | undefined> => {
+    const [row] = await query<{ did: string }>('SELECT did FROM sessions WHERE id = $1', [id]);
     return row?.did;
   },
-  touch: (id: string) => {
-    db.prepare('UPDATE sessions SET last_used_at = unixepoch() WHERE id = ?').run(id);
+  touch: async (id: string) => {
+    await query(`UPDATE sessions SET last_used_at = ${NOW} WHERE id = $1`, [id]);
   },
-  delete: (id: string) => {
-    db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+  delete: async (id: string) => {
+    await query('DELETE FROM sessions WHERE id = $1', [id]);
   },
 };
 
-function pruneStaleCompletionTokens(db: Database.Database) {
-  db.prepare('DELETE FROM completion_tokens WHERE created_at < unixepoch() - 3600').run();
-}
-
-// Unsubscribe events are logged for auditing then become stale — the PDS record
-// is already deleted, so there is no active subscription to track.
-function pruneStaleUnsubscribeEvents(db: Database.Database) {
-  db.prepare(
-    "DELETE FROM action_events WHERE action_type = 'unsubscribe' AND created_at < unixepoch() - ?"
-  ).run(NINETY_DAYS);
-}
-
-// Recommend and share events — one-off actions containing reader DIDs. Retained
-// for 90 days for analytics (within the /counts query cap), then pruned.
-// Subscribe events are deliberately excluded: active subscriptions must be kept
-// for the /notify fan-out query.
-function pruneStaleEngagementEvents(db: Database.Database) {
-  db.prepare(
-    "DELETE FROM action_events WHERE action_type IN ('recommend', 'share') AND created_at < unixepoch() - ?"
-  ).run(NINETY_DAYS);
-}
-
-// OAuth sessions inactive for 90+ days — updated_at reflects last token refresh.
-function pruneStaleOAuthSessions(db: Database.Database) {
-  db.prepare('DELETE FROM oauth_session WHERE updated_at < unixepoch() - ?').run(NINETY_DAYS);
-}
-
-// User sessions (scribe_session cookie) inactive for 90+ days.
-function pruneStaleUserSessions(db: Database.Database) {
-  db.prepare('DELETE FROM sessions WHERE last_used_at < unixepoch() - ?').run(NINETY_DAYS);
-}
-
 export const completionTokens = {
-  store: (token: string, action: string) => {
-    db.prepare(
-      'INSERT OR IGNORE INTO completion_tokens (token, action) VALUES (?, ?)'
-    ).run(token, action);
+  store: async (token: string, action: string) => {
+    await query(
+      'INSERT INTO completion_tokens (token, action) VALUES ($1, $2) ON CONFLICT (token) DO NOTHING',
+      [token, action],
+    );
   },
-  lookup: (token: string): string | undefined => {
-    const row = db
-      .prepare<string, { action: string }>('SELECT action FROM completion_tokens WHERE token = ?')
-      .get(token);
+  lookup: async (token: string): Promise<string | undefined> => {
+    const [row] = await query<{ action: string }>(
+      'SELECT action FROM completion_tokens WHERE token = $1',
+      [token],
+    );
     return row?.action;
   },
 };
 
 export const actionEvents = {
-  log: (opts: {
+  log: async (opts: {
     actionType: string;
     documentUri?: string | null;
     publicationUri?: string | null;
@@ -255,40 +211,52 @@ export const actionEvents = {
     did: string;
   }) => {
     const subjectUri = opts.documentUri ?? opts.publicationUri ?? '';
-    db.prepare(
+    await query(
       `INSERT INTO action_events
          (action_type, subject_uri, document_uri, publication_uri, origin, did)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(opts.actionType, subjectUri, opts.documentUri ?? null, opts.publicationUri ?? null, opts.origin, opts.did);
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        opts.actionType,
+        subjectUri,
+        opts.documentUri ?? null,
+        opts.publicationUri ?? null,
+        opts.origin,
+        opts.did,
+      ],
+    );
   },
 };
 
-export const allowedOrigins = {
-  isAllowed: (origin: string): boolean => {
-    const row = db
-      .prepare<string, { origin: string }>('SELECT origin FROM allowed_origins WHERE origin = ?')
-      .get(origin);
-    return row !== undefined;
-  },
-  add: (origin: string, ownerDid?: string) => {
-    db.prepare(
-      `INSERT INTO allowed_origins (origin, owner_did) VALUES (?, ?)
-         ON CONFLICT(origin) DO UPDATE SET owner_did = excluded.owner_did`
-    ).run(origin, ownerDid ?? null);
+export const follows = {
+  // A reader follows a Publication when their latest subscribe-or-unsubscribe
+  // event for it is a subscribe. Ties (same second) go to the later row.
+  activeDids: async (publicationUri: string): Promise<string[]> => {
+    const rows = await query<{ did: string }>(
+      `SELECT did FROM (
+         SELECT DISTINCT ON (did) did, action_type
+         FROM action_events
+         WHERE publication_uri = $1
+           AND action_type IN ('subscribe', 'unsubscribe')
+         ORDER BY did, created_at DESC, id DESC
+       ) latest
+       WHERE action_type = 'subscribe'`,
+      [publicationUri],
+    );
+    return rows.map((r) => r.did);
   },
 };
 
 export const initiateAttempts = {
-  record: (ip: string) => {
-    db.prepare('INSERT INTO initiate_attempts (ip) VALUES (?)').run(ip);
+  record: async (ip: string) => {
+    await query('INSERT INTO initiate_attempts (ip) VALUES ($1)', [ip]);
   },
-  count: (ip: string): number => {
-    const row = db
-      .prepare<[string, number], { n: number }>(
-        'SELECT COUNT(*) as n FROM initiate_attempts WHERE ip = ? AND created_at > unixepoch() - ?'
-      )
-      .get(ip, RATE_LIMIT_WINDOW);
+  count: async (ip: string): Promise<number> => {
+    const [row] = await query<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM initiate_attempts WHERE ip = $1 AND created_at > ${NOW} - $2`,
+      [ip, RATE_LIMIT_WINDOW],
+    );
     return row?.n ?? 0;
   },
-  isLimited: (ip: string): boolean => initiateAttempts.count(ip) >= RATE_LIMIT_MAX,
+  isLimited: async (ip: string): Promise<boolean> =>
+    (await initiateAttempts.count(ip)) >= RATE_LIMIT_MAX,
 };

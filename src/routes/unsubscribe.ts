@@ -1,8 +1,10 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { followedPublication } from '../utils/graphRecords.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
-import { allowedOrigins, completionTokens, actionEvents } from '../db.js';
+import { completionTokens, actionEvents } from '../db.js';
 import { handleForm, unsubscribeConfirmPage, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -27,7 +29,7 @@ async function findSubscriptionRkey(agent: Agent, did: string, publicationUri: s
         cursor,
       });
       const record = res.data.records.find(
-        (r) => (r.value as { subject?: string }).subject === publicationUri
+        (r) => followedPublication(r.value) === publicationUri
       );
       if (record) {
         return record.uri.split('/').pop() ?? null;
@@ -46,20 +48,23 @@ export async function handleUnsubscribe(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  // No origin: the unfollow link in a Follower Notification DM, opened in a
+  // tab rather than a website's popup. Removing your own Follow is safe from
+  // anywhere, so only a website's popup is checked.
+  if (origin && !await websiteMatches({ origin, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
       handleForm({
-        heading: title ? `Unsubscribe from ${title}` : 'Unsubscribe',
-        subtitle: 'Sign in with your Bluesky account to confirm your unsubscription.',
+        heading: title ? `Unfollow ${title}` : 'Unfollow',
+        subtitle: 'Sign in with your Bluesky account to unfollow.',
         action: 'unsubscribe',
         uri: publicationUri,
         origin,
@@ -74,8 +79,8 @@ export async function handleUnsubscribe(c: Context) {
     c.header('Set-Cookie', `scribe_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`);
     return c.html(
       handleForm({
-        heading: title ? `Unsubscribe from ${title}` : 'Unsubscribe',
-        subtitle: 'Sign in with your Bluesky account to confirm your unsubscription.',
+        heading: title ? `Unfollow ${title}` : 'Unfollow',
+        subtitle: 'Sign in with your Bluesky account to unfollow.',
         action: 'unsubscribe',
         uri: publicationUri,
         origin,
@@ -96,14 +101,17 @@ export async function handleUnsubscribePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  // No origin: the unfollow link in a Follower Notification DM, opened in a
+  // tab rather than a website's popup. Removing your own Follow is safe from
+  // anywhere, so only a website's popup is checked.
+  if (origin && !await websiteMatches({ origin, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -117,7 +125,7 @@ export async function handleUnsubscribePost(c: Context) {
 
   const rkey = await findSubscriptionRkey(agent, did, publicationUri);
   if (!rkey) {
-    return c.html(errorPage('No subscription found for this publication.'));
+    return c.html(errorPage("You don't follow this Publication."));
   }
 
   try {
@@ -128,11 +136,11 @@ export async function handleUnsubscribePost(c: Context) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    return c.html(errorPage(`Could not delete subscription: ${message}`));
+    return c.html(errorPage(`Could not unfollow: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'unsubscribe', publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'unsubscribe');
+  await actionEvents.log({ actionType: 'unsubscribe', publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'unsubscribe');
 
   return c.html(successPage({ action: 'unsubscribe', origin }));
 }

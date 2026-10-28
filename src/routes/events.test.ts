@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../app.js';
-import { db, actionEvents } from '../db.js';
+import { query, actionEvents } from '../db.js';
 
-const SECRET = process.env.NOTIFY_SECRET!;
+const SECRET = process.env.APP_API_SECRET!;
 const AUTH = { Authorization: `Bearer ${SECRET}` };
 const PUBLICATION_URI = 'at://did:plc:author/site.standard.publication/abc';
 const DOCUMENT_URI = 'at://did:plc:author/site.standard.document/doc1';
@@ -11,8 +11,8 @@ function get(query: string, headers: Record<string, string> = AUTH) {
   return app.request(`/events?${query}`, { headers });
 }
 
-beforeEach(() => {
-  db.exec('DELETE FROM action_events');
+beforeEach(async () => {
+  await query('DELETE FROM action_events');
 });
 
 describe('GET /events — auth', () => {
@@ -56,13 +56,13 @@ describe('GET /events — validation', () => {
 
 describe('GET /events — behaviour', () => {
   it('returns matching events for the given action_type and document_uri', async () => {
-    actionEvents.log({
+    await actionEvents.log({
       actionType: 'recommend',
       documentUri: DOCUMENT_URI,
       origin: 'https://norobots.blog',
       did: 'did:plc:reader1',
     });
-    actionEvents.log({
+    await actionEvents.log({
       actionType: 'share',
       documentUri: DOCUMENT_URI,
       origin: 'https://norobots.blog',
@@ -78,13 +78,13 @@ describe('GET /events — behaviour', () => {
   });
 
   it('filters by publication_uri for subscribe events', async () => {
-    actionEvents.log({
+    await actionEvents.log({
       actionType: 'subscribe',
       publicationUri: PUBLICATION_URI,
       origin: 'https://norobots.blog',
       did: 'did:plc:subscriber1',
     });
-    actionEvents.log({
+    await actionEvents.log({
       actionType: 'subscribe',
       publicationUri: 'at://did:plc:other/site.standard.publication/xyz',
       origin: 'https://norobots.blog',
@@ -98,7 +98,7 @@ describe('GET /events — behaviour', () => {
 
   it('respects the limit parameter', async () => {
     for (let i = 0; i < 3; i++) {
-      actionEvents.log({
+      await actionEvents.log({
         actionType: 'recommend',
         documentUri: DOCUMENT_URI,
         origin: 'https://norobots.blog',

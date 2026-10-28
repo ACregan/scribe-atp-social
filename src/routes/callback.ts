@@ -21,7 +21,7 @@ export async function handleCallback(c: Context) {
     return c.html(errorPage('Authentication failed. Please close this window and try again.'), 400);
   }
 
-  const sessionId = sessionStore.create(did);
+  const sessionId = await sessionStore.create(did);
 
   setCookie(c, SESSION_COOKIE, signSessionId(sessionId), {
     httpOnly: true,
@@ -42,9 +42,9 @@ export async function handleCallback(c: Context) {
   if (pending.action === 'recommend') {
     redirectPath = `/recommend?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
   } else if (pending.action === 'subscribe') {
-    redirectPath = `/subscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
+    redirectPath = `/follow?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
   } else if (pending.action === 'unsubscribe') {
-    redirectPath = `/unsubscribe?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
+    redirectPath = `/unfollow?publication=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${tokenParam}`;
   } else {
     const canonicalParam = pending.canonicalUrl ? `&canonicalUrl=${encodeURIComponent(pending.canonicalUrl)}` : '';
     const pubParam = pending.publication ? `&publication=${encodeURIComponent(pending.publication)}` : '';

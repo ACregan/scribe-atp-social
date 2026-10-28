@@ -1,13 +1,13 @@
 import type { Context } from 'hono';
-import { db } from '../db.js';
+import { query } from '../db.js';
 import { parseDate, validateDateRange } from '../utils/parseDate.js';
 import { verifyBearerSecret } from '../session.js';
 
 const VALID_ACTION_TYPES = new Set(['recommend', 'subscribe', 'share']);
 
-export function handleEvents(c: Context) {
+export async function handleEvents(c: Context) {
   const authHeader = c.req.header('Authorization') ?? '';
-  if (!verifyBearerSecret(authHeader, process.env.NOTIFY_SECRET)) {
+  if (!verifyBearerSecret(authHeader, process.env.APP_API_SECRET)) {
     return c.json({ ok: false, error: 'Unauthorized' }, 401);
   }
 
@@ -41,26 +41,33 @@ export function handleEvents(c: Context) {
   const limit = Math.min(100, Math.max(1, parseInt(q['limit'] ?? '50', 10) || 50));
   const offset = Math.max(0, parseInt(q['offset'] ?? '0', 10) || 0);
 
-  const conditions: string[] = ['action_type = ?'];
   const params: (string | number)[] = [actionType];
+  const conditions: string[] = ['action_type = $1'];
+  // Each condition takes the next $n placeholder.
+  const add = (sql: string, value: string | number) => {
+    params.push(value);
+    conditions.push(sql.replace('?', `$${params.length}`));
+  };
 
-  if (publicationUri) { conditions.push('publication_uri = ?'); params.push(publicationUri); }
-  if (documentUri)    { conditions.push('document_uri = ?');    params.push(documentUri); }
-  if (did)            { conditions.push('did = ?');              params.push(did); }
-  if (from !== null)  { conditions.push('created_at >= ?');      params.push(from); }
-  conditions.push('created_at <= ?'); params.push(to);
+  if (publicationUri) add('publication_uri = ?', publicationUri);
+  if (documentUri)    add('document_uri = ?', documentUri);
+  if (did)            add('did = ?', did);
+  if (from !== null)  add('created_at >= ?', from);
+  add('created_at <= ?', to);
 
   const where = conditions.join(' AND ');
 
-  const total = (db.prepare<(string | number)[], { count: number }>(
-    `SELECT COUNT(*) as count FROM action_events WHERE ${where}`
-  ).get(...params) as { count: number }).count;
+  const [{ count: total }] = await query<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM action_events WHERE ${where}`,
+    params,
+  );
 
-  const events = db.prepare<(string | number)[], Record<string, unknown>>(
+  const events = await query<Record<string, unknown>>(
     `SELECT action_type, did, document_uri, publication_uri, origin, created_at
      FROM action_events WHERE ${where}
-     ORDER BY created_at DESC LIMIT ? OFFSET ?`
-  ).all(...params, limit, offset);
+     ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
+  );
 
   return c.json({ events, total });
 }

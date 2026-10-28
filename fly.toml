@@ -1,0 +1,28 @@
+# skyscribe-social (ADR 0097 in skyscribe-app). First deploy: see README.
+app = "skyscribe-social"
+primary_region = "iad" # Ashburn, VA: next to Neon's us-east-1, like skyscribe-app.
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  PUBLIC_URL = "https://social.skyscribe.app"
+  SKYSCRIBE_APP_URL = "https://skyscribe.app"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Always on: a reader's sign-in popup shouldn't wait for a cold start.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

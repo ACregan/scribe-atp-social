@@ -1,8 +1,10 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { followedPublication } from '../utils/graphRecords.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
-import { allowedOrigins, completionTokens, actionEvents } from '../db.js';
+import { completionTokens, actionEvents } from '../db.js';
 import { handleForm, confirmPage, alreadyActioned, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -26,7 +28,7 @@ async function hasExistingSubscription(agent: Agent, did: string, publicationUri
         limit: 100,
         cursor,
       });
-      if (res.data.records.some((r) => (r.value as { subject?: string }).subject === publicationUri)) {
+      if (res.data.records.some((r) => followedPublication(r.value) === publicationUri)) {
         return true;
       }
       cursor = res.data.cursor;
@@ -43,20 +45,20 @@ export async function handleSubscribe(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
       handleForm({
-        heading: title ? `Subscribe to ${title}` : 'Subscribe',
-        subtitle: 'Sign in with your Bluesky account to subscribe.',
+        heading: title ? `Follow ${title}` : 'Follow',
+        subtitle: 'Sign in with your Bluesky account to follow.',
         action: 'subscribe',
         uri: publicationUri,
         origin,
@@ -71,8 +73,8 @@ export async function handleSubscribe(c: Context) {
     c.header('Set-Cookie', `scribe_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`);
     return c.html(
       handleForm({
-        heading: title ? `Subscribe to ${title}` : 'Subscribe',
-        subtitle: 'Sign in with your Bluesky account to subscribe.',
+        heading: title ? `Follow ${title}` : 'Follow',
+        subtitle: 'Sign in with your Bluesky account to follow.',
         action: 'subscribe',
         uri: publicationUri,
         origin,
@@ -86,7 +88,7 @@ export async function handleSubscribe(c: Context) {
   const { agent, handle } = result;
 
   if (await hasExistingSubscription(agent, did, publicationUri)) {
-    if (token) completionTokens.store(token, 'subscribe');
+    if (token) await completionTokens.store(token, 'subscribe');
     return c.html(alreadyActioned({ action: 'subscribe', title, origin }));
   }
 
@@ -99,14 +101,14 @@ export async function handleSubscribePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -119,7 +121,7 @@ export async function handleSubscribePost(c: Context) {
   const { agent } = result;
 
   if (await hasExistingSubscription(agent, did, publicationUri)) {
-    if (token) completionTokens.store(token, 'subscribe');
+    if (token) await completionTokens.store(token, 'subscribe');
     return c.html(alreadyActioned({ action: 'subscribe', title: '', origin }));
   }
 
@@ -129,7 +131,7 @@ export async function handleSubscribePost(c: Context) {
       collection: 'site.standard.graph.subscription',
       record: {
         $type: 'site.standard.graph.subscription',
-        subject: publicationUri,
+        publication: publicationUri,
         createdAt: new Date().toISOString(),
       },
     });
@@ -138,8 +140,8 @@ export async function handleSubscribePost(c: Context) {
     return c.html(errorPage(`Could not create record: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'subscribe', publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'subscribe');
+  await actionEvents.log({ actionType: 'subscribe', publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'subscribe');
 
   return c.html(successPage({ action: 'subscribe', origin }));
 }

@@ -1,7 +1,8 @@
 import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import { PENDING_COOKIE, PENDING_MAX_AGE } from '../config.js';
-import { allowedOrigins, initiateAttempts } from '../db.js';
+import { initiateAttempts } from '../db.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient, OAUTH_SCOPE } from '../oauth.js';
 import { encodePending, type PendingData } from '../session.js';
 import { getClientIp } from '../auth.js';
@@ -19,8 +20,20 @@ export async function handleInitiate(c: Context) {
   const canonicalUrl = (body.canonicalUrl as string) || undefined;
   const publication = (body.publication as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.html(errorPage('Invalid origin.'), 400);
+  // For Follow and unfollow, uri is the Publication; for Like and Share it's
+  // the Document, with the Publication alongside when the button knows it.
+  const isPublicationAction = action === 'subscribe' || action === 'unsubscribe';
+  // An unfollow from a DM's link has no website origin (see unsubscribe.ts).
+  const originless = action === 'unsubscribe' && !origin;
+  if (
+    !originless &&
+    !await websiteMatches({
+      origin,
+      publicationUri: isPublicationAction ? uri : publication,
+      documentUri: isPublicationAction ? undefined : uri,
+    })
+  ) {
+    return c.html(errorPage("This button isn't on its Publication's website."), 403);
   }
 
   if (action !== 'recommend' && action !== 'subscribe' && action !== 'unsubscribe' && action !== 'share') {
@@ -33,14 +46,14 @@ export async function handleInitiate(c: Context) {
 
   const headingMap = {
     recommend: `Like "${title}"`,
-    subscribe: `Subscribe to ${title}`,
-    unsubscribe: `Unsubscribe from ${title}`,
+    subscribe: `Follow ${title}`,
+    unsubscribe: `Unfollow ${title}`,
     share: `Share "${title}"`,
   };
   const subtitleMap = {
     recommend: 'Sign in with your Bluesky account to like this article.',
-    subscribe: 'Sign in with your Bluesky account to subscribe.',
-    unsubscribe: 'Sign in with your Bluesky account to confirm your unsubscription.',
+    subscribe: 'Sign in with your Bluesky account to follow.',
+    unsubscribe: 'Sign in with your Bluesky account to unfollow.',
     share: 'Sign in with your Bluesky account to share this article.',
   };
 
@@ -62,14 +75,14 @@ export async function handleInitiate(c: Context) {
 
   const ip = getClientIp(c);
 
-  if (initiateAttempts.isLimited(ip)) {
+  if (await initiateAttempts.isLimited(ip)) {
     return c.html(
       handleForm({ ...formOpts, error: 'Too many attempts. Please try again in a few minutes.' }),
       429
     );
   }
 
-  initiateAttempts.record(ip);
+  await initiateAttempts.record(ip);
 
   let authUrl: URL;
   try {

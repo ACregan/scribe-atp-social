@@ -31,7 +31,7 @@ function safeEqual(a: string, b: string): boolean {
   }
 }
 
-// Shared by /notify and /events — both previously compared the Authorization
+// Shared by /followers and /events — they previously compared the Authorization
 // header with plain `!==`, which leaks timing information about how many
 // leading bytes of the secret matched. Every other secret comparison in this
 // service (session/pending signatures) already used timingSafeEqual; this

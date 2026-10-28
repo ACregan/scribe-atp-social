@@ -1,8 +1,10 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { likedDocument } from '../utils/graphRecords.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
-import { allowedOrigins, completionTokens, actionEvents } from '../db.js';
+import { completionTokens, actionEvents } from '../db.js';
 import { handleForm, confirmPage, alreadyActioned, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -26,7 +28,7 @@ async function hasExistingRecommend(agent: Agent, did: string, documentUri: stri
         limit: 100,
         cursor,
       });
-      if (res.data.records.some((r) => (r.value as { subject?: string }).subject === documentUri)) {
+      if (res.data.records.some((r) => likedDocument(r.value) === documentUri)) {
         return true;
       }
       cursor = res.data.cursor;
@@ -44,14 +46,14 @@ export async function handleRecommend(c: Context) {
   const token = c.req.query('token') || undefined;
   const publication = c.req.query('publication') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, documentUri, publicationUri: publication })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
@@ -89,7 +91,7 @@ export async function handleRecommend(c: Context) {
   const { agent, handle } = result;
 
   if (await hasExistingRecommend(agent, did, documentUri)) {
-    if (token) completionTokens.store(token, 'recommend');
+    if (token) await completionTokens.store(token, 'recommend');
     return c.html(alreadyActioned({ action: 'recommend', title, origin }));
   }
 
@@ -103,14 +105,14 @@ export async function handleRecommendPost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, documentUri, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -123,7 +125,7 @@ export async function handleRecommendPost(c: Context) {
   const { agent } = result;
 
   if (await hasExistingRecommend(agent, did, documentUri)) {
-    if (token) completionTokens.store(token, 'recommend');
+    if (token) await completionTokens.store(token, 'recommend');
     return c.html(alreadyActioned({ action: 'recommend', title: '', origin }));
   }
 
@@ -133,7 +135,7 @@ export async function handleRecommendPost(c: Context) {
       collection: 'site.standard.graph.recommend',
       record: {
         $type: 'site.standard.graph.recommend',
-        subject: documentUri,
+        document: documentUri,
         createdAt: new Date().toISOString(),
       },
     });
@@ -142,8 +144,8 @@ export async function handleRecommendPost(c: Context) {
     return c.html(errorPage(`Could not create record: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'recommend', documentUri, publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'recommend');
+  await actionEvents.log({ actionType: 'recommend', documentUri, publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'recommend');
 
   return c.html(successPage({ action: 'recommend', origin }));
 }

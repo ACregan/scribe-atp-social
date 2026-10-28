@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../app.js';
-import { db, actionEvents } from '../db.js';
+import { query, actionEvents } from '../db.js';
 
 const DOCUMENT_URI = 'at://did:plc:author/site.standard.document/doc1';
 
@@ -14,8 +14,8 @@ function get(query: string, ip?: string) {
   return app.request(`/counts?${query}`, { headers: { 'x-forwarded-for': forwardedFor } });
 }
 
-beforeEach(() => {
-  db.exec('DELETE FROM action_events');
+beforeEach(async () => {
+  await query('DELETE FROM action_events');
 });
 
 describe('GET /counts — validation', () => {
@@ -54,8 +54,8 @@ describe('GET /counts — validation', () => {
 
 describe('GET /counts — behaviour', () => {
   it('returns a plain count with no group_by', async () => {
-    actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r1' });
-    actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r2' });
+    await actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r1' });
+    await actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r2' });
 
     const res = await get(`action_type=recommend&document_uri=${encodeURIComponent(DOCUMENT_URI)}`);
     expect(await res.json()).toEqual({ count: 2 });
@@ -63,9 +63,9 @@ describe('GET /counts — behaviour', () => {
 
   it('groups by document_uri, ordered by count descending', async () => {
     const otherDoc = 'at://did:plc:author/site.standard.document/doc2';
-    actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r1' });
-    actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r2' });
-    actionEvents.log({ actionType: 'recommend', documentUri: otherDoc, origin: 'https://norobots.blog', did: 'did:plc:r3' });
+    await actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r1' });
+    await actionEvents.log({ actionType: 'recommend', documentUri: DOCUMENT_URI, origin: 'https://norobots.blog', did: 'did:plc:r2' });
+    await actionEvents.log({ actionType: 'recommend', documentUri: otherDoc, origin: 'https://norobots.blog', did: 'did:plc:r3' });
 
     const res = await get('action_type=recommend&group_by=document_uri');
     const body = (await res.json()) as { groups: Array<{ key: string; count: number }>; total: number };

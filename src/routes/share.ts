@@ -1,8 +1,10 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
-import { allowedOrigins, completionTokens, actionEvents } from '../db.js';
+import { completionTokens, actionEvents } from '../db.js';
+import { fetchAtRecord } from '../utils/atRecord.js';
 import { handleForm, shareConfirmPage, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -11,32 +13,6 @@ async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: s
     const agent = new Agent(session);
     const desc = await agent.com.atproto.repo.describeRepo({ repo: did });
     return { agent, handle: desc.data.handle };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchAtRecord(atUri: string): Promise<{ cid: string; value: Record<string, unknown> } | null> {
-  try {
-    const match = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
-    if (!match) return null;
-    const [, did, collection, rkey] = match;
-
-    const didDocRes = await fetch(`https://plc.directory/${encodeURIComponent(did)}`);
-    if (!didDocRes.ok) return null;
-    const didDoc = await didDocRes.json() as { service?: Array<{ id: string; serviceEndpoint: string }> };
-    const pds = didDoc.service?.find((s) => s.id === '#atproto_pds')?.serviceEndpoint;
-    if (!pds) return null;
-
-    const url = new URL(`${pds}/xrpc/com.atproto.repo.getRecord`);
-    url.searchParams.set('repo', did);
-    url.searchParams.set('collection', collection);
-    url.searchParams.set('rkey', rkey);
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json() as { cid?: string; value?: Record<string, unknown> };
-    if (!data.cid) return null;
-    return { cid: data.cid, value: data.value ?? {} };
   } catch {
     return null;
   }
@@ -54,14 +30,14 @@ export async function handleShare(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, documentUri, publicationUri: publicationUri || undefined })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
 
   if (!did) {
     return c.html(
@@ -115,8 +91,8 @@ export async function handleSharePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, documentUri, publicationUri: publicationUri || undefined })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
@@ -125,7 +101,7 @@ export async function handleSharePost(c: Context) {
     return c.html(errorPage('Post text cannot be empty.'));
   }
 
-  const did = getSessionDid(c);
+  const did = await getSessionDid(c);
   if (!did) {
     return c.html(errorPage('Session not found. Please close this window and try again.'));
   }
@@ -214,8 +190,8 @@ export async function handleSharePost(c: Context) {
     return c.html(errorPage(`Could not create post: ${message}`));
   }
 
-  actionEvents.log({ actionType: 'share', documentUri, publicationUri, origin, did });
-  if (token) completionTokens.store(token, 'share');
+  await actionEvents.log({ actionType: 'share', documentUri, publicationUri, origin, did });
+  if (token) await completionTokens.store(token, 'share');
 
   return c.html(successPage({ action: 'share', origin }));
 }

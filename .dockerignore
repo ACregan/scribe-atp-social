@@ -1,0 +1,9 @@
+# The image builds its own node_modules from package-lock.json, and
+# `flyctl deploy --remote-only` uploads this directory as build context.
+node_modules
+dist
+data
+.git
+.gitlab-ci.yml
+.env
+coverage

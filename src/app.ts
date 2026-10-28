@@ -8,17 +8,21 @@ import { handleShare, handleSharePost } from './routes/share.js';
 import { handleInitiate } from './routes/initiate.js';
 import { handleCallback } from './routes/callback.js';
 import { handleStatus } from './routes/status.js';
-import { handleNotify } from './routes/notify.js';
 import { handleEvents } from './routes/events.js';
 import { handleCounts } from './routes/counts.js';
-import { handleAddOrigin } from './routes/origins.js';
-import { allowedOrigins } from './db.js';
+import { handleFollowers } from './routes/followers.js';
 
 export const app = new Hono();
 
 app.get('/client-metadata.json', handleClientMetadata);
 app.get('/recommend', handleRecommend);
 app.post('/recommend', handleRecommendPost);
+// /follow and /unfollow are the paths (ADR 0097 decision 12). /subscribe and
+// /unsubscribe stay for older SDK versions and DMs already sent.
+app.get('/follow', handleSubscribe);
+app.post('/follow', handleSubscribePost);
+app.get('/unfollow', handleUnsubscribe);
+app.post('/unfollow', handleUnsubscribePost);
 app.get('/subscribe', handleSubscribe);
 app.post('/subscribe', handleSubscribePost);
 app.get('/unsubscribe', handleUnsubscribe);
@@ -29,12 +33,10 @@ app.post('/initiate', handleInitiate);
 app.get('/callback', handleCallback);
 
 app.get('/status/:token', handleStatus);
-app.post('/notify', handleNotify);
-app.post('/origins', handleAddOrigin);
 app.get('/events', handleEvents);
-app.use(
-  '/counts',
-  cors({ origin: (origin) => (allowedOrigins.isAllowed(origin) ? origin : undefined) })
-);
+app.get('/followers', handleFollowers);
+// Open to any website (ADR 0097 decision 5): the counts are public totals,
+// and /counts is rate-limited per IP.
+app.use('/counts', cors({ origin: '*' }));
 app.get('/counts', handleCounts);
 app.get('/health', (c) => c.json({ ok: true }));
