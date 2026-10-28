@@ -17,6 +17,7 @@ export interface PendingData {
   token?: string;
   canonicalUrl?: string;
   publication?: string;
+  quick?: boolean;
 }
 
 function hmac(value: string): string {

@@ -123,6 +123,25 @@ describe('GET /callback', () => {
     expect(location).toContain(`publication=${encodeURIComponent(pending.publication!)}`);
   });
 
+  it('keeps a quick share quick across sign-in (ADR 0097)', async () => {
+    vi.mocked(oauthClient.callback).mockResolvedValue({
+      session: { sub: 'did:plc:testuser' },
+    } as never);
+    const res = await app.request('/callback?code=abc&state=xyz', {
+      headers: {
+        Cookie: pendingCookie({
+          action: 'share',
+          uri: 'at://did:plc:author/site.standard.document/doc1',
+          origin: 'https://norobots.blog',
+          title: 'An Article',
+          quick: true,
+        }),
+      },
+      redirect: 'manual',
+    });
+    expect(res.headers.get('location')).toMatch(/^\/share\?.*&quick=1$/);
+  });
+
   it('returns a 400 "session expired" page when there is no pending cookie, but still sets a session cookie', async () => {
     vi.mocked(oauthClient.callback).mockResolvedValue({
       session: { sub: 'did:plc:testuser' },

@@ -48,7 +48,8 @@ export async function handleCallback(c: Context) {
   } else {
     const canonicalParam = pending.canonicalUrl ? `&canonicalUrl=${encodeURIComponent(pending.canonicalUrl)}` : '';
     const pubParam = pending.publication ? `&publication=${encodeURIComponent(pending.publication)}` : '';
-    redirectPath = `/share?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${canonicalParam}${pubParam}${tokenParam}`;
+    const quickParam = pending.quick ? '&quick=1' : '';
+    redirectPath = `/share?document=${encodeURIComponent(pending.uri)}&origin=${encodeURIComponent(pending.origin)}&title=${encodeURIComponent(pending.title)}${canonicalParam}${pubParam}${tokenParam}${quickParam}`;
   }
 
   return c.redirect(redirectPath);

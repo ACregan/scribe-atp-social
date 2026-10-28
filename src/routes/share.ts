@@ -29,6 +29,10 @@ export async function handleShare(c: Context) {
   const origin = c.req.query('origin') ?? '';
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
+  // Share without the compose step: the site turned off "Ask before
+  // sharing" (ADR 0097 in skyscribe-app). The popup still opens from the
+  // reader's own click, and only on the Publication's own website.
+  const quick = c.req.query('quick') === '1';
 
   if (!await websiteMatches({ origin, documentUri, publicationUri: publicationUri || undefined })) {
     return c.text("This button isn't on its Publication's website.", 403);
@@ -51,6 +55,7 @@ export async function handleShare(c: Context) {
         token,
         canonicalUrl,
         publication: publicationUri,
+        quick,
       })
     );
   }
@@ -69,6 +74,7 @@ export async function handleShare(c: Context) {
         token,
         canonicalUrl,
         publication: publicationUri,
+        quick,
         error: 'Your session expired. Please sign in again.',
       })
     );
@@ -78,7 +84,7 @@ export async function handleShare(c: Context) {
   const defaultText = title && canonicalUrl ? `${title} ${canonicalUrl}` : canonicalUrl || title;
 
   return c.html(
-    shareConfirmPage({ handle, documentUri, publicationUri, canonicalUrl, defaultText, origin, token })
+    shareConfirmPage({ handle, documentUri, publicationUri, canonicalUrl, defaultText, origin, token, quick })
   );
 }
 
