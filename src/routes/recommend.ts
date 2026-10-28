@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { likedDocument } from '../utils/graphRecords.js';
 import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
 import { completionTokens, actionEvents } from '../db.js';
@@ -27,7 +28,7 @@ async function hasExistingRecommend(agent: Agent, did: string, documentUri: stri
         limit: 100,
         cursor,
       });
-      if (res.data.records.some((r) => (r.value as { subject?: string }).subject === documentUri)) {
+      if (res.data.records.some((r) => likedDocument(r.value) === documentUri)) {
         return true;
       }
       cursor = res.data.cursor;
@@ -134,7 +135,7 @@ export async function handleRecommendPost(c: Context) {
       collection: 'site.standard.graph.recommend',
       record: {
         $type: 'site.standard.graph.recommend',
-        subject: documentUri,
+        document: documentUri,
         createdAt: new Date().toISOString(),
       },
     });

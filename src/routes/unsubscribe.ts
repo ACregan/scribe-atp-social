@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { followedPublication } from '../utils/graphRecords.js';
 import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
 import { completionTokens, actionEvents } from '../db.js';
@@ -28,7 +29,7 @@ async function findSubscriptionRkey(agent: Agent, did: string, publicationUri: s
         cursor,
       });
       const record = res.data.records.find(
-        (r) => (r.value as { subject?: string }).subject === publicationUri
+        (r) => followedPublication(r.value) === publicationUri
       );
       if (record) {
         return record.uri.split('/').pop() ?? null;

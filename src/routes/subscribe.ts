@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { followedPublication } from '../utils/graphRecords.js';
 import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
 import { completionTokens, actionEvents } from '../db.js';
@@ -27,7 +28,7 @@ async function hasExistingSubscription(agent: Agent, did: string, publicationUri
         limit: 100,
         cursor,
       });
-      if (res.data.records.some((r) => (r.value as { subject?: string }).subject === publicationUri)) {
+      if (res.data.records.some((r) => followedPublication(r.value) === publicationUri)) {
         return true;
       }
       cursor = res.data.cursor;
@@ -130,7 +131,7 @@ export async function handleSubscribePost(c: Context) {
       collection: 'site.standard.graph.subscription',
       record: {
         $type: 'site.standard.graph.subscription',
-        subject: publicationUri,
+        publication: publicationUri,
         createdAt: new Date().toISOString(),
       },
     });
