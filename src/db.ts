@@ -92,6 +92,15 @@ const SCHEMA = `
       ON action_events (publication_uri, action_type, created_at);
     CREATE INDEX IF NOT EXISTS action_events_type_time
       ON action_events (action_type, created_at);
+
+    -- When a Follower's Follow record was last found in their account
+    -- (followers.ts). Only 'still following' is cached.
+    CREATE TABLE IF NOT EXISTS follow_checks (
+      publication_uri TEXT   NOT NULL,
+      did             TEXT   NOT NULL,
+      checked_at      BIGINT NOT NULL,
+      PRIMARY KEY (publication_uri, did)
+    );
 `;
 
 // One statement at a time: PGlite (the tests) refuses several in one query.
@@ -128,6 +137,8 @@ export async function prune() {
   );
   // OAuth sessions inactive for 90+ days — updated_at reflects last token refresh.
   await query(`DELETE FROM oauth_session WHERE updated_at < ${NOW} - $1`, [NINETY_DAYS]);
+  // Follow checks hold reader DIDs: a stale one is just checked again.
+  await query(`DELETE FROM follow_checks WHERE checked_at < ${NOW} - $1`, [NINETY_DAYS]);
   // User sessions (scribe_session cookie) inactive for 90+ days.
   await query(`DELETE FROM sessions WHERE last_used_at < ${NOW} - $1`, [NINETY_DAYS]);
 }

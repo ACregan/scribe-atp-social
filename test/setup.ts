@@ -6,7 +6,7 @@ import { migrate, setDbClient } from '../src/db.js';
 // or misbehave if they're missing, so these must be set here rather than in
 // individual test files.
 process.env.SESSION_SECRET ??= 'test-session-secret-at-least-32-characters-long';
-process.env.NOTIFY_SECRET ??= 'test-notify-secret';
+process.env.APP_API_SECRET ??= 'test-app-api-secret';
 
 // A fresh in-process Postgres per test file (tests within a file share it,
 // so they clear the tables they use). int8 parsed to numbers, as pg.ts does.

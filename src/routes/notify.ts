@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { AtpAgent } from '@atproto/api';
-import { follows } from '../db.js';
+import { checkedFollowers } from '../followers.js';
 import { verifyBearerSecret } from '../session.js';
 
 interface NotifyBody {
@@ -28,7 +28,7 @@ async function sendDm(agent: AtpAgent, convoId: string, text: string): Promise<v
 
 export async function handleNotify(c: Context) {
   const authHeader = c.req.header('Authorization') ?? '';
-  if (!verifyBearerSecret(authHeader, process.env.NOTIFY_SECRET)) {
+  if (!verifyBearerSecret(authHeader, process.env.APP_API_SECRET)) {
     return c.json({ ok: false, error: 'Unauthorized' }, 401);
   }
 
@@ -52,7 +52,7 @@ export async function handleNotify(c: Context) {
     return c.json({ ok: false, error: 'articleTitle and canonicalUrl are required' }, 400);
   }
 
-  const subscriberDids = await follows.activeDids(publicationUri);
+  const subscriberDids = await checkedFollowers(publicationUri, 0);
   if (subscriberDids.length === 0) {
     return c.json({ ok: true, sent: 0, skipped: 0 });
   }

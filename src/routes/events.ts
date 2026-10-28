@@ -7,7 +7,7 @@ const VALID_ACTION_TYPES = new Set(['recommend', 'subscribe', 'share']);
 
 export async function handleEvents(c: Context) {
   const authHeader = c.req.header('Authorization') ?? '';
-  if (!verifyBearerSecret(authHeader, process.env.NOTIFY_SECRET)) {
+  if (!verifyBearerSecret(authHeader, process.env.APP_API_SECRET)) {
     return c.json({ ok: false, error: 'Unauthorized' }, 401);
   }
 

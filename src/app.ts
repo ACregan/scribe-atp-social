@@ -11,6 +11,7 @@ import { handleStatus } from './routes/status.js';
 import { handleNotify } from './routes/notify.js';
 import { handleEvents } from './routes/events.js';
 import { handleCounts } from './routes/counts.js';
+import { handleFollowers } from './routes/followers.js';
 
 export const app = new Hono();
 
@@ -35,6 +36,7 @@ app.get('/callback', handleCallback);
 app.get('/status/:token', handleStatus);
 app.post('/notify', handleNotify);
 app.get('/events', handleEvents);
+app.get('/followers', handleFollowers);
 // Open to any website (ADR 0097 decision 5): the counts are public totals,
 // and /counts is rate-limited per IP.
 app.use('/counts', cors({ origin: '*' }));

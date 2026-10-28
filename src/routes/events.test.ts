@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../app.js';
 import { query, actionEvents } from '../db.js';
 
-const SECRET = process.env.NOTIFY_SECRET!;
+const SECRET = process.env.APP_API_SECRET!;
 const AUTH = { Authorization: `Bearer ${SECRET}` };
 const PUBLICATION_URI = 'at://did:plc:author/site.standard.publication/abc';
 const DOCUMENT_URI = 'at://did:plc:author/site.standard.document/doc1';

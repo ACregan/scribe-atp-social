@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { app } from '../app.js';
 import { query, actionEvents } from '../db.js';
 
-const SECRET = process.env.NOTIFY_SECRET!;
+const SECRET = process.env.APP_API_SECRET!;
 const PUBLICATION_URI = 'at://did:plc:author/site.standard.publication/abc';
 
 function post(body: unknown, headers: Record<string, string> = {}) {
@@ -82,6 +82,8 @@ describe('POST /notify — behaviour', () => {
   });
 
   it('fails with 500 when subscribers exist but author credentials are not configured', async () => {
+    // The Follower check can't reach the reader's PDS: they're kept, unchecked.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 500 })));
     await actionEvents.log({
       actionType: 'subscribe',
       publicationUri: PUBLICATION_URI,
@@ -93,6 +95,7 @@ describe('POST /notify — behaviour', () => {
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ ok: false, error: 'Author credentials not configured' });
+    vi.unstubAllGlobals();
   });
 
   it('does not count a did whose latest action is unsubscribe as an active subscriber', async () => {
