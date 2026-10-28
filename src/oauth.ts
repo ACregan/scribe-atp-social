@@ -3,7 +3,7 @@ import { oauthStateStore, oauthSessionStore } from './db.js';
 import { OAUTH_SCOPE } from './config.js';
 
 const isProduction = process.env.NODE_ENV === 'production';
-const publicUrl = process.env.PUBLIC_URL ?? 'https://social.scribe-atp.app';
+const publicUrl = process.env.PUBLIC_URL ?? 'https://social.skyscribe.app';
 const port = process.env.PORT ?? '3011';
 
 const clientId = isProduction
@@ -30,7 +30,7 @@ function requestLock<T>(key: string, fn: () => T | PromiseLike<T>): Promise<T> {
 export const oauthClient = new NodeOAuthClient({
   requestLock,
   clientMetadata: {
-    client_name: 'Scribe Social',
+    client_name: 'SkyScribe',
     client_id: clientId,
     client_uri: isProduction ? publicUrl : 'http://localhost',
     redirect_uris: [redirectUri],

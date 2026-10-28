@@ -17,6 +17,12 @@ export const app = new Hono();
 app.get('/client-metadata.json', handleClientMetadata);
 app.get('/recommend', handleRecommend);
 app.post('/recommend', handleRecommendPost);
+// /follow and /unfollow are the paths (ADR 0097 decision 12). /subscribe and
+// /unsubscribe stay for older SDK versions and DMs already sent.
+app.get('/follow', handleSubscribe);
+app.post('/follow', handleSubscribePost);
+app.get('/unfollow', handleUnsubscribe);
+app.post('/unfollow', handleUnsubscribePost);
 app.get('/subscribe', handleSubscribe);
 app.post('/subscribe', handleSubscribePost);
 app.get('/unsubscribe', handleUnsubscribe);

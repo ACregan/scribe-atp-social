@@ -26,7 +26,7 @@ describe('GET /callback', () => {
     expect(await res.text()).toMatch(/Authentication failed/);
   });
 
-  it('sets a signed session cookie and redirects to /subscribe for a subscribe action', async () => {
+  it('sets a signed session cookie and redirects to /follow for a subscribe action', async () => {
     vi.mocked(oauthClient.callback).mockResolvedValue({
       session: { sub: 'did:plc:testuser' },
     } as never);
@@ -45,7 +45,7 @@ describe('GET /callback', () => {
 
     expect(res.status).toBe(302);
     const location = res.headers.get('location')!;
-    expect(location).toMatch(/^\/subscribe\?/);
+    expect(location).toMatch(/^\/follow\?/);
     expect(location).toContain(encodeURIComponent(pending.uri));
     expect(location).toContain(encodeURIComponent(pending.origin));
 
@@ -78,7 +78,7 @@ describe('GET /callback', () => {
     expect(location).toContain('token=tok-123');
   });
 
-  it('redirects to /unsubscribe for an unsubscribe action', async () => {
+  it('redirects to /unfollow for an unsubscribe action', async () => {
     vi.mocked(oauthClient.callback).mockResolvedValue({
       session: { sub: 'did:plc:testuser' },
     } as never);
@@ -95,7 +95,7 @@ describe('GET /callback', () => {
       redirect: 'manual',
     });
 
-    expect(res.headers.get('location')).toMatch(/^\/unsubscribe\?/);
+    expect(res.headers.get('location')).toMatch(/^\/unfollow\?/);
   });
 
   it('redirects to /share for a share action, including canonicalUrl and publication', async () => {

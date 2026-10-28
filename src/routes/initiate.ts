@@ -23,7 +23,10 @@ export async function handleInitiate(c: Context) {
   // For Follow and unfollow, uri is the Publication; for Like and Share it's
   // the Document, with the Publication alongside when the button knows it.
   const isPublicationAction = action === 'subscribe' || action === 'unsubscribe';
+  // An unfollow from a DM's link has no website origin (see unsubscribe.ts).
+  const originless = action === 'unsubscribe' && !origin;
   if (
+    !originless &&
     !await websiteMatches({
       origin,
       publicationUri: isPublicationAction ? uri : publication,
@@ -43,14 +46,14 @@ export async function handleInitiate(c: Context) {
 
   const headingMap = {
     recommend: `Like "${title}"`,
-    subscribe: `Subscribe to ${title}`,
-    unsubscribe: `Unsubscribe from ${title}`,
+    subscribe: `Follow ${title}`,
+    unsubscribe: `Unfollow ${title}`,
     share: `Share "${title}"`,
   };
   const subtitleMap = {
     recommend: 'Sign in with your Bluesky account to like this article.',
-    subscribe: 'Sign in with your Bluesky account to subscribe.',
-    unsubscribe: 'Sign in with your Bluesky account to confirm your unsubscription.',
+    subscribe: 'Sign in with your Bluesky account to follow.',
+    unsubscribe: 'Sign in with your Bluesky account to unfollow.',
     share: 'Sign in with your Bluesky account to share this article.',
   };
 

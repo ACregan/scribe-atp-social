@@ -47,7 +47,10 @@ export async function handleUnsubscribe(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!await websiteMatches({ origin, publicationUri })) {
+  // No origin: the unfollow link in a Follower Notification DM, opened in a
+  // tab rather than a website's popup. Removing your own Follow is safe from
+  // anywhere, so only a website's popup is checked.
+  if (origin && !await websiteMatches({ origin, publicationUri })) {
     return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
@@ -59,8 +62,8 @@ export async function handleUnsubscribe(c: Context) {
   if (!did) {
     return c.html(
       handleForm({
-        heading: title ? `Unsubscribe from ${title}` : 'Unsubscribe',
-        subtitle: 'Sign in with your Bluesky account to confirm your unsubscription.',
+        heading: title ? `Unfollow ${title}` : 'Unfollow',
+        subtitle: 'Sign in with your Bluesky account to unfollow.',
         action: 'unsubscribe',
         uri: publicationUri,
         origin,
@@ -75,8 +78,8 @@ export async function handleUnsubscribe(c: Context) {
     c.header('Set-Cookie', `scribe_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`);
     return c.html(
       handleForm({
-        heading: title ? `Unsubscribe from ${title}` : 'Unsubscribe',
-        subtitle: 'Sign in with your Bluesky account to confirm your unsubscription.',
+        heading: title ? `Unfollow ${title}` : 'Unfollow',
+        subtitle: 'Sign in with your Bluesky account to unfollow.',
         action: 'unsubscribe',
         uri: publicationUri,
         origin,
@@ -97,7 +100,10 @@ export async function handleUnsubscribePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!await websiteMatches({ origin, publicationUri })) {
+  // No origin: the unfollow link in a Follower Notification DM, opened in a
+  // tab rather than a website's popup. Removing your own Follow is safe from
+  // anywhere, so only a website's popup is checked.
+  if (origin && !await websiteMatches({ origin, publicationUri })) {
     return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
@@ -118,7 +124,7 @@ export async function handleUnsubscribePost(c: Context) {
 
   const rkey = await findSubscriptionRkey(agent, did, publicationUri);
   if (!rkey) {
-    return c.html(errorPage('No subscription found for this publication.'));
+    return c.html(errorPage("You don't follow this Publication."));
   }
 
   try {
@@ -129,7 +135,7 @@ export async function handleUnsubscribePost(c: Context) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    return c.html(errorPage(`Could not delete subscription: ${message}`));
+    return c.html(errorPage(`Could not unfollow: ${message}`));
   }
 
   await actionEvents.log({ actionType: 'unsubscribe', publicationUri, origin, did });

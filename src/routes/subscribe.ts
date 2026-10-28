@@ -56,8 +56,8 @@ export async function handleSubscribe(c: Context) {
   if (!did) {
     return c.html(
       handleForm({
-        heading: title ? `Subscribe to ${title}` : 'Subscribe',
-        subtitle: 'Sign in with your Bluesky account to subscribe.',
+        heading: title ? `Follow ${title}` : 'Follow',
+        subtitle: 'Sign in with your Bluesky account to follow.',
         action: 'subscribe',
         uri: publicationUri,
         origin,
@@ -72,8 +72,8 @@ export async function handleSubscribe(c: Context) {
     c.header('Set-Cookie', `scribe_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`);
     return c.html(
       handleForm({
-        heading: title ? `Subscribe to ${title}` : 'Subscribe',
-        subtitle: 'Sign in with your Bluesky account to subscribe.',
+        heading: title ? `Follow ${title}` : 'Follow',
+        subtitle: 'Sign in with your Bluesky account to follow.',
         action: 'subscribe',
         uri: publicationUri,
         origin,
