@@ -1,7 +1,8 @@
 import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import { PENDING_COOKIE, PENDING_MAX_AGE } from '../config.js';
-import { allowedOrigins, initiateAttempts } from '../db.js';
+import { initiateAttempts } from '../db.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient, OAUTH_SCOPE } from '../oauth.js';
 import { encodePending, type PendingData } from '../session.js';
 import { getClientIp } from '../auth.js';
@@ -19,8 +20,17 @@ export async function handleInitiate(c: Context) {
   const canonicalUrl = (body.canonicalUrl as string) || undefined;
   const publication = (body.publication as string) || undefined;
 
-  if (!await allowedOrigins.isAllowed(origin)) {
-    return c.html(errorPage('Invalid origin.'), 400);
+  // For Follow and unfollow, uri is the Publication; for Like and Share it's
+  // the Document, with the Publication alongside when the button knows it.
+  const isPublicationAction = action === 'subscribe' || action === 'unsubscribe';
+  if (
+    !await websiteMatches({
+      origin,
+      publicationUri: isPublicationAction ? uri : publication,
+      documentUri: isPublicationAction ? undefined : uri,
+    })
+  ) {
+    return c.html(errorPage("This button isn't on its Publication's website."), 403);
   }
 
   if (action !== 'recommend' && action !== 'subscribe' && action !== 'unsubscribe' && action !== 'share') {

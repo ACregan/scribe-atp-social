@@ -11,8 +11,6 @@ import { handleStatus } from './routes/status.js';
 import { handleNotify } from './routes/notify.js';
 import { handleEvents } from './routes/events.js';
 import { handleCounts } from './routes/counts.js';
-import { handleAddOrigin } from './routes/origins.js';
-import { allowedOrigins } from './db.js';
 
 export const app = new Hono();
 
@@ -30,11 +28,9 @@ app.get('/callback', handleCallback);
 
 app.get('/status/:token', handleStatus);
 app.post('/notify', handleNotify);
-app.post('/origins', handleAddOrigin);
 app.get('/events', handleEvents);
-app.use(
-  '/counts',
-  cors({ origin: async (origin) => ((await allowedOrigins.isAllowed(origin)) ? origin : undefined) })
-);
+// Open to any website (ADR 0097 decision 5): the counts are public totals,
+// and /counts is rate-limited per IP.
+app.use('/counts', cors({ origin: '*' }));
 app.get('/counts', handleCounts);
 app.get('/health', (c) => c.json({ ok: true }));

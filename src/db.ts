@@ -92,32 +92,12 @@ const SCHEMA = `
       ON action_events (publication_uri, action_type, created_at);
     CREATE INDEX IF NOT EXISTS action_events_type_time
       ON action_events (action_type, created_at);
-
-    CREATE TABLE IF NOT EXISTS allowed_origins (
-      origin     TEXT   PRIMARY KEY,
-      owner_did  TEXT,
-      created_at BIGINT NOT NULL DEFAULT ${NOW}
-    );
 `;
 
 // One statement at a time: PGlite (the tests) refuses several in one query.
 export async function migrate() {
   for (const statement of SCHEMA.split(';')) {
     if (statement.trim()) await query(statement);
-  }
-  // The origins that were hardcoded in config.ts's ALLOWED_ORIGINS, so
-  // existing consumer sites don't lose access.
-  for (const origin of [
-    'https://norobots.blog',
-    'https://anthonycregan.co.uk',
-    'https://www.anthonycregan.co.uk',
-    'https://perpetualsummer.ltd',
-    'https://www.perpetualsummer.ltd',
-    'https://scribe-cms.app',
-  ]) {
-    await query('INSERT INTO allowed_origins (origin) VALUES ($1) ON CONFLICT (origin) DO NOTHING', [
-      origin,
-    ]);
   }
 }
 
@@ -252,20 +232,6 @@ export const follows = {
       [publicationUri],
     );
     return rows.map((r) => r.did);
-  },
-};
-
-export const allowedOrigins = {
-  isAllowed: async (origin: string): Promise<boolean> => {
-    const rows = await query('SELECT origin FROM allowed_origins WHERE origin = $1', [origin]);
-    return rows.length > 0;
-  },
-  add: async (origin: string, ownerDid?: string) => {
-    await query(
-      `INSERT INTO allowed_origins (origin, owner_did) VALUES ($1, $2)
-         ON CONFLICT (origin) DO UPDATE SET owner_did = excluded.owner_did`,
-      [origin, ownerDid ?? null],
-    );
   },
 };
 

@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
-import { allowedOrigins, completionTokens, actionEvents } from '../db.js';
+import { completionTokens, actionEvents } from '../db.js';
 import { handleForm, confirmPage, alreadyActioned, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -44,8 +45,8 @@ export async function handleRecommend(c: Context) {
   const token = c.req.query('token') || undefined;
   const publication = c.req.query('publication') || undefined;
 
-  if (!await allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, documentUri, publicationUri: publication })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);
@@ -103,8 +104,8 @@ export async function handleRecommendPost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!await allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, documentUri, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!documentUri.startsWith('at://')) {
     return c.text('Invalid document URI', 400);

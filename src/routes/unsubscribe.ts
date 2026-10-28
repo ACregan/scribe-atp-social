@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
 import { Agent } from '@atproto/api';
 import { getSessionDid } from '../auth.js';
+import { websiteMatches } from '../websiteCheck.js';
 import { oauthClient } from '../oauth.js';
-import { allowedOrigins, completionTokens, actionEvents } from '../db.js';
+import { completionTokens, actionEvents } from '../db.js';
 import { handleForm, unsubscribeConfirmPage, successPage, errorPage } from '../views.js';
 
 async function getAgentAndHandle(did: string): Promise<{ agent: Agent; handle: string } | null> {
@@ -46,8 +47,8 @@ export async function handleUnsubscribe(c: Context) {
   const title = c.req.query('title') ?? '';
   const token = c.req.query('token') || undefined;
 
-  if (!await allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
@@ -96,8 +97,8 @@ export async function handleUnsubscribePost(c: Context) {
   const origin = (body.origin as string) ?? '';
   const token = (body.token as string) || undefined;
 
-  if (!await allowedOrigins.isAllowed(origin)) {
-    return c.text('Invalid origin', 400);
+  if (!await websiteMatches({ origin, publicationUri })) {
+    return c.text("This button isn't on its Publication's website.", 403);
   }
   if (!publicationUri.startsWith('at://')) {
     return c.text('Invalid publication URI', 400);
