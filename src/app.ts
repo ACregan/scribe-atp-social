@@ -8,7 +8,6 @@ import { handleShare, handleSharePost } from './routes/share.js';
 import { handleInitiate } from './routes/initiate.js';
 import { handleCallback } from './routes/callback.js';
 import { handleStatus } from './routes/status.js';
-import { handleNotify } from './routes/notify.js';
 import { handleEvents } from './routes/events.js';
 import { handleCounts } from './routes/counts.js';
 import { handleFollowers } from './routes/followers.js';
@@ -34,7 +33,6 @@ app.post('/initiate', handleInitiate);
 app.get('/callback', handleCallback);
 
 app.get('/status/:token', handleStatus);
-app.post('/notify', handleNotify);
 app.get('/events', handleEvents);
 app.get('/followers', handleFollowers);
 // Open to any website (ADR 0097 decision 5): the counts are public totals,

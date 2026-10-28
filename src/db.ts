@@ -130,7 +130,7 @@ export async function prune() {
   // Recommend and share events — one-off actions containing reader DIDs.
   // Retained for 90 days for analytics (within the /counts query cap), then
   // pruned. Subscribe events are deliberately excluded: active subscriptions
-  // must be kept for the /notify fan-out query.
+  // must be kept: they are the Follower list (followers.ts).
   await query(
     `DELETE FROM action_events WHERE action_type IN ('recommend', 'share') AND created_at < ${NOW} - $1`,
     [NINETY_DAYS],

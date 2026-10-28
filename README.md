@@ -31,7 +31,6 @@ Words: a reader **Follows** a Publication and is one of its **Followers**
 | `GET` | `/followers` | Bearer `APP_API_SECRET` | A Publication's checked Followers, for skyscribe-app |
 | `GET` | `/events` | Bearer `APP_API_SECRET` | Raw action event log |
 | `GET` | `/counts` | — (any origin) | Aggregate counts, rate limited |
-| `POST` | `/notify` | Bearer `APP_API_SECRET` | Legacy Scribe CMS DMs; removed in ADR 0097 chunk 4 |
 | `GET` | `/health` | — | Health check |
 
 ## The website check
@@ -43,6 +42,9 @@ to a SkyScribe Site showing that Publication. There's nothing to register.
 An unfollow link opened from a DM has no origin and isn't checked.
 
 ## `GET /followers`
+
+Follower Notifications (the DMs about a new post) are sent by skyscribe-app
+from the author's own account, not by this service.
 
 A Publication's Followers: readers whose latest Follow-or-unfollow here was
 a Follow and whose Follow record is still in their account (ADR 0097
@@ -169,7 +171,6 @@ GET /counts?action_type=share&from=-30d&group_by=document_uri&order_by=count&lim
 | `APP_API_SECRET` | Bearer secret skyscribe-app sends to `/followers` and `/events` (its `SOCIAL_API_SECRET`) |
 | `SKYSCRIBE_APP_URL` | skyscribe-app's base URL, for the website check (set in `fly.toml`) |
 | `SOCIAL_RESOLVE_SECRET` | The same value as skyscribe-app's `SOCIAL_RESOLVE_SECRET` |
-| `AUTHOR_HANDLE`, `AUTHOR_APP_PASSWORD` | Legacy `/notify` sender; removed with it |
 | `PORT` | Server port (8080 on Fly, default 3011) |
 
 ## Development
@@ -187,7 +188,7 @@ The manual `deploy` job on `main` runs `flyctl deploy --remote-only` with the
 1. Create the Neon database `skyscribe_social` and the Fly app
    `skyscribe-social` (`fly apps create skyscribe-social`).
 2. `fly secrets set DATABASE_URL=… SESSION_SECRET=… APP_API_SECRET=…
-   SOCIAL_RESOLVE_SECRET=… AUTHOR_HANDLE=… AUTHOR_APP_PASSWORD=…`, set
+   SOCIAL_RESOLVE_SECRET=…`, set
    `SOCIAL_RESOLVE_SECRET` on skyscribe-app too, add `FLY_API_TOKEN` to this
    repo's CI variables, and run the `deploy` job.
 3. `fly certs add social.skyscribe.app`, and the DNS record it asks for in the
