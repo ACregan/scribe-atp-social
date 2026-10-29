@@ -119,3 +119,19 @@ describe('websiteMatches', () => {
     expect(calls.length).toBe(after);
   });
 });
+
+describe('the SkyScribe Reader', () => {
+  it('counts for any Publication or Document, without looking anything up', async () => {
+    const calls = stubNetwork({});
+    expect(await websiteMatches({ origin: 'https://reader.skyscribe.app', publicationUri: PUB })).toBe(true);
+    expect(await websiteMatches({ origin: 'https://reader.skyscribe.app', documentUri: DOC })).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it('is only the Reader itself, not a host that merely contains its name', async () => {
+    stubNetwork({ [PUB]: { url: 'https://example.com' } });
+    expect(
+      await websiteMatches({ origin: 'https://reader.skyscribe.app.evil.example', publicationUri: PUB }),
+    ).toBe(false);
+  });
+});

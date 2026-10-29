@@ -39,6 +39,10 @@ A popup only works on its own Publication's website (ADR 0097 decision 5):
 the `origin` it reports must be the Publication's `url` host (`www.` and the
 bare domain alike), or a hostname skyscribe-app's site-resolve endpoint maps
 to a SkyScribe Site showing that Publication. There's nothing to register.
+The SkyScribe Reader (`reader.skyscribe.app`) passes for every Publication: it
+shows any Publication's records from its own PDS and says where its Home is
+(skyscribe-app ADR 0098, skyscribe-site ADR 0022).
+
 An unfollow link opened from a DM has no origin and isn't checked.
 
 ## `GET /followers`

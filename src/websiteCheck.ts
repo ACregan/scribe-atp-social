@@ -10,6 +10,13 @@ import { fetchAtRecord } from './utils/atRecord.js';
 // (subdomain, Custom Domain or Previous Address). `www.` and the bare domain
 // count as the same site.
 
+// The SkyScribe Reader shows any Publication and Document faithfully from
+// its owner's PDS, and says where its Home is, so its buttons count for
+// every Publication (skyscribe-app ADR 0098; skyscribe-site ADR 0022). It
+// isn't someone else's website collecting Follows for a Publication it
+// doesn't belong to, which is what this check stops.
+export const READER_HOST = 'reader.skyscribe.app';
+
 const MATCH_TTL_MS = 10 * 60 * 1000;
 // Short, so fixing a Publication's url takes effect quickly.
 const MISMATCH_TTL_MS = 60 * 1000;
@@ -89,6 +96,7 @@ export async function websiteMatches(opts: {
 }): Promise<boolean> {
   const host = originHost(opts.origin);
   if (!host) return false;
+  if (siteHost(host) === READER_HOST) return true;
 
   const site =
     opts.publicationUri ||
